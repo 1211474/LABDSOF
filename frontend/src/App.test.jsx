@@ -33,7 +33,7 @@ describe('App', () => {
   it('renders services returned by the Care Platform API', async () => {
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /rede de apoio/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /carebnb/i, level: 1 })).toBeInTheDocument()
     expect(await screen.findByText('Farmácia da Boavista')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
       .toHaveAttribute('href', 'tel:+351220000001')
