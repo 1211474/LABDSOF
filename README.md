@@ -1,23 +1,78 @@
 # Rede de Apoio a Cuidadores Informais
-## O Problema
 
-**Comunidade-alvo**: Cuidadores informais (não profissionais) de familiares dependentes — idosos com demência, pessoas com doença crónica, deficiência, ou em recuperação pós-cirúrgica — numa área urbana ou concelho específico (ex: um município ou uma freguesia com forte densidade de população idosa).
+## Requirements
 
-**Problema central**: Cuidadores informais vivem numa situação de fragilidade permanente que se agrava dramaticamente com pequenas disrupções do quotidiano:
+- Docker Engine with Docker Compose v2
+- Or, for local development: JDK 21, Maven 3.9+, Node.js 20+ and PostgreSQL 16
 
- - Falta de um medicamento específico na farmácia habitual
- - Encerramento temporário de um centro de dia ou lar de apoio
- - Falha do transporte adaptado (ex: para hemodiálise, fisioterapia)
- - O próprio cuidador adoece e não tem substituto
- - Cortes de energia que afetam equipamento médico em casa (concentradores de oxigénio, etc.)
- - Informação dispersa e desatualizada sobre serviços de apoio disponíveis
+## Run the application with Docker
 
-**Stakeholders afetados**:
+```bash
+docker compose up --build
+```
 
- - Cuidador informal (utilizador primário)
- - Pessoa cuidada (beneficiário indireto)
- - Rede familiar alargada (irmãos, filhos que vivem longe)
- - Farmácias e centros de saúde locais
- - Centros de dia, lares, IPSS, Santa Casa da Misericórdia
- - Autarquia (ação social)
- - Voluntários e vizinhos dispostos a ajudar pontualmente
+Open <http://localhost:3000>.
+
+Replace the path if the project is in a different directory.
+
+Application URLs:
+
+- Frontend: <http://localhost:3000>
+- Care Platform API: <http://localhost:8080>
+- Support Assistant Service: <http://localhost:8081>
+- Care Platform health: <http://localhost:8080/actuator/health>
+- Support Assistant health: <http://localhost:8081/actuator/health>
+
+Stop the application:
+
+```bash
+docker compose down
+```
+
+Stop the application and remove local database data:
+
+```bash
+docker compose down -v
+```
+
+PostgreSQL credentials can be overridden with `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD` environment variables.
+
+## Run the application locally
+
+Start PostgreSQL:
+
+```bash
+docker compose up -d db
+```
+
+Run each component in a separate terminal:
+
+```bash
+mvn -f care-platform-api/pom.xml spring-boot:run
+mvn -f support-assistant-service/pom.xml spring-boot:run
+cd frontend
+npm ci
+npm run dev
+```
+
+The frontend runs at <http://localhost:5173> and proxies `/api/v1/ai` to port 8081 and other `/api` calls to port 8080.
+
+## Run the tests
+
+Backend:
+
+```bash
+mvn -f care-platform-api/pom.xml verify
+mvn -f support-assistant-service/pom.xml verify
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm ci
+npm test
+npm run build
+```
+
+JaCoCo reports are generated at `care-platform-api/target/site/jacoco/index.html` and `support-assistant-service/target/site/jacoco/index.html`.
