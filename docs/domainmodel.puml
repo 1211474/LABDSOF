@@ -1,0 +1,131 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty members
+
+class User {
+  +id : UUID
+  +email : String
+  +passwordHash : String
+  +role : Role
+  +active : Boolean
+  +createdAt : Instant
+}
+class Caregiver {
+  +phoneNumber : String
+}
+class SupportMember {
+  +phoneNumber : String
+}
+class ProviderStaff
+
+class CareRecipient {
+  +id : UUID
+  +coarseAccessibilityTags : Set<AccessibilityTag>
+}
+class SupportContact {
+  +id : UUID
+  +relationship : SupportRelationship
+  +isEmergencyContact : Boolean
+}
+
+class SupportRequest {
+  +id : UUID
+  +taskDescription : String
+  +location : String
+  +timeWindow : String
+  +createdAt : Instant
+  +resolvedAt : Instant
+  +status() : RequestStatus
+}
+class SupportRequestRecipient {
+  +id : UUID
+  +status : ResponseStatus
+  +respondedAt : Instant
+}
+class Notification {
+  +id : UUID
+  +type : NotificationType
+  +channel : NotificationChannel
+  +status : DeliveryStatus
+  +attempts : Integer
+  +lastAttemptAt : Instant
+  +idempotencyKey : String
+  +createdAt : Instant
+}
+
+class Organisation {
+  +id : UUID
+  +name : String
+  +verificationState : VerificationState
+  +verifiedAt : Instant
+}
+class SupportService {
+  +id : UUID
+  +name : String
+  +type : ServiceType
+  +coarseLocation : String
+  +contactPhone : String
+  +accessibilityTags : Set<AccessibilityTag>
+  +currentStatus : ServiceStatus
+  +operatingHours : String
+  +infoSource : InformationSource
+  +lastUpdated : Instant
+}
+class ServiceUpdate {
+  +id : UUID
+  +status : ServiceStatus
+  +operatingHours : String
+  +notice : String
+  +source : InformationSource
+  +validUntil : Instant
+  +state : UpdateState
+  +publishedAt : Instant
+}
+
+class AIQuery {
+  +id : UUID
+  +sanitizedQuery : String
+  +outcome : QueryOutcome
+  +createdAt : Instant
+}
+class AIResponse {
+  +id : UUID
+  +answer : String
+  +limitationNotice : String
+  +isFallback : Boolean
+  +createdAt : Instant
+}
+class AuditLogEntry {
+  +id : UUID
+  +actionType : AuditActionType
+  +targetType : String
+  +targetId : UUID
+  +createdAt : Instant
+}
+
+User <|-- Caregiver
+User <|-- SupportMember
+User <|-- ProviderStaff
+
+Caregiver "1" --> "0..*" CareRecipient : cares for
+Caregiver "1" --> "0..*" SupportContact : has
+SupportContact "0..*" --> "1" SupportMember : is a
+Caregiver "1" --> "0..*" SupportRequest : creates
+SupportRequest "0..*" --> "0..1" CareRecipient : refers to
+SupportRequest "1" *-- "1..*" SupportRequestRecipient : sent to
+SupportRequestRecipient "0..*" --> "1" SupportMember : recipient
+SupportRequest "0..1" --> "0..*" Notification : triggers
+Notification "0..*" --> "1" User : addressed to
+Notification "0..*" --> "0..1" ServiceUpdate : about
+
+ProviderStaff "0..*" --> "1" Organisation : member of
+Organisation "1" --> "0..*" SupportService : operates
+SupportService "1" *-- "0..*" ServiceUpdate : history
+ProviderStaff "0..1" --> "0..*" ServiceUpdate : published by
+
+User "1" --> "0..*" AIQuery : asks
+AIQuery "1" --> "0..1" AIResponse : produces
+AIResponse "0..*" --> "0..*" ServiceUpdate : cites
+User "1" --> "0..*" AuditLogEntry : performs
+@enduml
