@@ -67,7 +67,7 @@ A story is Done only when:
 # User Journeys
 
 # User Journeys
-## Journey 1: Find an alternative when a service fails (gui)
+## Journey 1: Find an alternative when a service fails
 **Primary persona:** Ana, a time-constrained caregiver with high digital literacy.
 **Situation:** Ana’s regular pharmacy does not have her mother’s medication, or another essential service is no longer available.
 **Goal:** Find a relevant, nearby, and sufficiently reliable alternative in under 3 minutes.
@@ -88,7 +88,7 @@ A story is Done only when:
 **Critical requirements:** quick-access dashboard; search and filters; results with source, status, and freshness; clear language; direct contact; no result should present availability as a guarantee.
 
 **Associated criteria:** at least 80% completion without intervention, at least 90% correct identification of the next action, and a median time to a relevant result of 3 minutes or less, as defined in Private ([https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-352](https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-352)).
-## Journey 2: Ask for help and coordinate a support person - Filipe
+## Journey 2: Ask for help and coordinate a support person
 **Primary persona:** Ana. **Involved persona:** Rui, a family member, neighbour, or volunteer.
 **Situation:** Ana becomes ill, cannot collect medication, or needs someone to accompany her mother.
 **Goal:** Turn an urgent and vague need into a concrete, limited, and easy-to-accept request.
@@ -732,152 +732,220 @@ Main user journeys (provisional, to be validated with user research):
 2. **Transport cancelled:** a low-literacy caregiver taps one button, sees options in plain language and calls the institution or asks a family member for help.
 3. **Day-care centre closing:** a provider publishes an Official closure notice and families are notified.
 4. **Request for help:** a caregiver sends a request (what, where, when) to a support contact, who accepts or declines.
-# Product Details
+## Product Details
+**Key features (epics)**
+*   **Access and care profile (E1):** secure login, role-based access, basic care profile with non-sensitive tags, emergency contacts and quick-access dashboard.
+*   **Find an alternative (E2):** search and filtering of local services by type, location, accessibility and status.
+*   **AI-assisted navigation (E3):** plain-language questions answered only from verified service data, with guardrails and a fallback to standard search.
+*   **Check and confirm (E4):** service details with source, verification state and last update, plus a prominent “Call” button.
+*   **Support network (E5):** concrete support requests (what, where, when) sent to a backup contact, with asynchronous notifications and accept/decline responses.
+*   **Service information (E6):** verified providers publish Official status updates in under one minute.
+**UX principles**
+*   Mobile-first and accessibility-first: large text, high contrast, large touch targets, simple language and few steps.
+*   A human contact option (call the institution) at every critical point.
+*   Availability is never presented as a guarantee; source and freshness are always visible.
+**Main non-functional requirements**
+*   **Security and privacy:** backend-enforced authentication and RBAC, data minimisation, no mandatory medical documents, and no personal or sensitive data sent to the external LLM.
+*   **Responsible AI:** the AI only retrieves and summarises verified data, never gives medical advice, and redirects emergencies to 112 / SNS 24.
+*   **Reliability:** if the AI fails, core features keep working and users fall back to standard search.
+*   **Performance:** relevant result in a median of 3 minutes or less; provider update in under 1 minute.
+*   **Quality:** at least 80% test coverage on new backend code, plus CI/CD, logging and health checks.
+**Technology and constraints**
+*   React + Tailwind CSS, Java/Spring Boot, PostgreSQL, and a managed external LLM API.
+*   Two independently deployable backend components (Care Platform API and Support Assistant Service) communicating over REST.
+*   GDPR compliance with defined retention and deletion rules.
+**Release plan**
+*   **Release 1 (walking skeleton):** login, search (standard and AI), service details with call, support requests, and provider status updates.
+*   **Release 2:** dashboard, filters, expiry warnings, request responses and status, provider validity, correction and audit history.
+*   **Later:** delegated setup, community reports, multi-recipient requests and closure notifications.
+See the Product Backlog and Story Map for the full list of user stories.
 
 # Product Backlog
 
-# Product Backlog
-The Product Backlog is prioritized using the INVEST principles, adhering to the project's Definition of Ready (DoR), and estimated using standard Fibonacci story points (1, 2, 3, 5, 8, 13).
-> Priority Legend: High (Essential for MVP) / Medium (Important for UX/Validation)
+# Story Mapping
+We built a story map to create a clear, prioritised product backlog. It shows how stories fit into the caregiver’s journey, what depends on what, and what the smallest usable first release is, before we define epics and detailed user stories.
 
-| ID | Title / Backlog Item | User Story Description | Priority | Estimate (Pts) |
-| ---| ---| ---| ---| --- |
-| US01 | Authentication & Basic RBAC | As a registered user, I want to log in securely with role-based access control, so that my data and care information are protected according to my role. | High | 5 |
-| US02 | Simplified Care Profile | As an informal caregiver, I want to create and access a basic care profile with minimal non-sensitive data, so that I can quickly manage emergency contacts and essential needs. | High | 5 |
-| US03 | Local Service Search & Filters | As a caregiver, I want to search for local services by type, location, accessibility, and status, so that I can find relevant alternatives when my care routine fails. | High | 8 |
-| US04 | Service Detail & Direct Call | As an older/time-poor caregiver, I want to view clear service details with freshness timestamps, source, verification state, and a prominent "Call" button, so that I can confirm availability immediately. | High | 3 |
-| US05 | Fast Updates by Verified Entities | As a verified service provider, I want to update my service status, schedule, or notices in under one minute, so that caregivers receive accurate and up-to-date information. | High | 5 |
-| US06 | Support Request Dispatch | As a caregiver, I want to send a concrete support request (what/where/when) to a backup contact, so that I can coordinate help when I'm unavailable. | High | 5 |
-| US07 | Support Request Management | As a backup family member or volunteer, I want to accept or decline a support request, so that the caregiver knows my availability immediately. | High | 3 |
-| US08 | Bounded AI Service Navigator | As a caregiver, I want to ask questions in plain language (e.g., "pharmacies open near Boavista"), so that I can find alternatives quickly using a grounded AI assistant. | High | 8 |
-| US09 | AI Safety Filters & Guardrails | As a caregiver, I want the AI assistant to display source context, limitations, and human fallbacks (and refuse medical diagnoses or emergency advice), so that I get trustworthy, non-harmful recommendations. | High | 5 |
-| US10 | Accessible & Mobile-First UI | As an older caregiver, I want large text, high contrast, and large touch targets across the application, so that I can navigate the platform easily despite visual or digital literacy barriers. | Medium | 5 |
-| US11 | Quick-Access Care Dashboard | As a caregiver, I want a simplified dashboard with 1-click searches and emergency contacts, so that I can reach a solution within 3 minutes during a disruption. | Medium | 5 |
+**Structure.**
+*   **Backbone (left to right):** the main activities of the user’s journey, from getting started to keeping provider information current.
+*   **Priority (top to bottom):** stories are ordered by importance under each activity.
+*   **Releases (horizontal slices):** Release 1 is the walking skeleton, the thinnest end-to-end version that delivers value. Release 2 extends it, and Release n holds later ideas. Empty cells mean nothing is planned.
+*   **Cross-cutting band:** work that applies to every release, such as accessibility, data minimisation, testing, CI/CD, logging and failure handling.
+*   **Epics (E1–E8):** each story is tagged with its epic.
+
+**Inputs.** The map is based on the proto-personas, the user journeys and BPMN workflows, and the assignment requirements.
+
+**Team process.** The map was built collaboratively by the team and serves as a shared reference for scope and priorities. It is a living document and will be refined as the team’s understanding of the product evolves.
+
+![](https://t90122138845.p.clickup-attachments.com/t90122138845/961443db-aece-430e-97af-1b97222bc1ad/image.png)
+
+# Epics
+
+| Epic | Name | Scope |
+| ---| ---| --- |
+| E1 | Access and care profile | Authentication, role-based access, care profile, emergency contacts, dashboard |
+| E2 | Find an alternative | Search and filtering of local services |
+| E3 | AI-assisted navigation | Plain-language search grounded in verified data, AI guardrails, non-AI fallback |
+| E4 | Check and confirm | Service details, source and freshness of information, confirming by phone |
+| E5 | Support network | Support requests to backup contacts, asynchronous notification, responses |
+| E6 | Service information | Provider verification and updates, information validity, external data source |
+| E7 | Inclusive, privacy-first design | Accessible mobile-first UI, data minimisation |
+| E8 | Quality and operations | Automated tests, CI/CD, logging, health checks, metrics, failure handling |
+
+# Product Backlog
+Stories are estimated with standard Fibonacci story points (1, 2, 3, 5, 8, 13) and must meet the project's Definition of Ready (DoR). Estimates are the first team proposal and should be confirmed in planning.
+
+> **Priority (MoSCoW):** **Must** = needed for the walking skeleton (Release 1) and for the assignment's required capabilities; **Should** = important, in Release 2; **Could** = desirable if time allows; **Won't (this time)** = agreed for later, not in the current scope.
+
+## Release 1: Walking skeleton
+
+| ID | Epic | Title | User Story Description | Priority (MoSCoW) | Estimate (Pts) |
+| ---| ---| ---| ---| ---| --- |
+| US01 | E1 | Log in as caregiver or provider | As a registered user, I want to log in securely as a caregiver or a provider, so that my data and care information are protected. | Must | 5 |
+| US02 | E1 | Restrict features by role | As a platform owner, I want features to be restricted by role, so that each user only accesses what their role allows. | Must | 3 |
+| US03 | E1 | Create basic care profile | As an informal caregiver, I want to create a basic care profile using only non-sensitive tags, so that I can describe essential needs without sharing medical data. | Must | 3 |
+| US04 | E1 | Manage emergency contacts | As an informal caregiver, I want to manage my emergency contacts, so that I can reach them quickly when my care routine fails. | Must | 3 |
+| US05 | E2 | Search services by type and location | As a caregiver, I want to search for local services by type and location, so that I can find relevant alternatives when my care routine fails. | Must | 5 |
+| US06 | E3 | Ask a question in plain language | As a caregiver, I want to type a question in plain language (e.g., "pharmacies open near Boavista"), so that I do not need to learn filters or menus. | Must | 3 |
+| US07 | E3 | Answer built only from verified service data | As a caregiver, I want the assistant's answer to be built only from verified service data, so that I can rely on what it tells me. | Must | 5 |
+| US08 | E3 | AI guardrails | As a caregiver, I want the AI assistant to show its sources and limitations and to refuse medical or emergency questions, so that I get trustworthy, non-harmful answers. | Must | 5 |
+| US09 | E3 | Fall back to standard search if AI is unavailable | As a caregiver, I want to be able to use the standard search when the AI assistant is unavailable, so that I can still find alternatives. | Must | 3 |
+| US10 | E4 | View service details | As a time-poor caregiver, I want to view clear service details with source and last update, so that I can judge how reliable the information is. | Must | 3 |
+| US11 | E4 | Call button with "confirm by phone" notice | As a caregiver, I want a prominent "Call" button with a notice to confirm by phone, so that I can verify availability directly. | Must | 2 |
+| US12 | E5 | Send support request | As a caregiver, I want to send a concrete support request (what, where, when) to a backup contact, so that I can coordinate help when I'm unavailable. | Must | 5 |
+| US13 | E5 | Notify contact asynchronously | As a caregiver, I want the backup contact to be notified in the background, so that I do not have to wait while my request is delivered. | Must | 5 |
+| US14 | E5 | Retry failed notifications without duplicates | As a caregiver, I want failed notifications to be retried without sending duplicates, so that my request reaches the contact even if the first attempt fails. | Must | 5 |
+| US15 | E6 | Verify provider organisation | As the platform, I want to verify provider organisations, so that only verified providers publish official status updates. | Must | 5 |
+| US16 | E6 | Update service status in under a minute | As a verified service provider, I want to update my service status in under one minute, so that caregivers receive accurate, up-to-date information marked as Official. | Must | 5 |
+
+## Release 2
+
+| ID | Epic | Title | User Story Description | Priority (MoSCoW) | Estimate (Pts) |
+| ---| ---| ---| ---| ---| --- |
+| US17 | E1 | Quick-access dashboard with 1-click searches | As a caregiver, I want a simplified dashboard with 1-click searches and emergency contacts, so that I can reach a solution within 3 minutes during a disruption. | Should | 5 |
+| US18 | E2 | Filter by accessibility needs | As a caregiver, I want to filter services by accessibility needs, so that I only see services that fit the person I care for. | Should | 3 |
+| US19 | E2 | Filter by open or closed status | As a caregiver, I want to filter services by open or closed status, so that I see only services available now. | Could | 2 |
+| US20 | E4 | Warn when information has expired | As a caregiver, I want to be warned when a service's information has expired, so that I do not rely on outdated data. | Should | 3 |
+| US21 | E5 | Accept or decline a request | As a backup family member or volunteer, I want to accept or decline a support request, so that the caregiver knows my availability immediately. | Should | 3 |
+| US22 | E5 | See request status on the dashboard | As a caregiver, I want to see the status of my support requests on the dashboard, so that I know whether help is on the way. | Should | 3 |
+| US23 | E6 | Set validity period | As a verified service provider, I want to set a validity period for my updates, so that outdated information expires automatically. | Should | 3 |
+| US24 | E6 | Correct or remove information | As a verified service provider, I want to correct or remove information I published, so that mistakes do not mislead caregivers. | Should | 3 |
+| US25 | E6 | Audit history of changes | As a platform owner, I want an audit history of changes to service information, so that updates are traceable. | Could | 5 |
+
+## Release n (later)
+
+| ID | Epic | Title | User Story Description | Priority (MoSCoW) | Estimate (Pts) |
+| ---| ---| ---| ---| ---| --- |
+| US26 | E1 | Grant a family member access to a care profile | As a caregiver with low digital literacy, I want to give a family member access to my care profile, so that they can help me use the platform. | Won't (this time) | 5 |
+| US27 | E1 | Set up the care profile on behalf of a caregiver | As a family member, I want to set up the care profile on behalf of a caregiver, so that they can use the platform with help. | Won't (this time) | 3 |
+| US28 | E4 | Submit a community report | As a caregiver, I want to submit a report about a service (e.g., it is closed today), so that other caregivers are warned. | Won't (this time) | 5 |
+| US29 | E4 | Show community reports separate from Official | As a caregiver, I want community reports clearly separated from official provider information, so that I can use both without confusing them. | Won't (this time) | 3 |
+| US30 | E5 | Send to several people | As a caregiver, I want to send a support request to several people, so that I have a better chance of getting help. | Won't (this time) | 5 |
+| US31 | E5 | Choose next contact after a decline | As a caregiver, I want to choose the next contact when a request is declined, so that I can keep looking for help. | Won't (this time) | 3 |
+| US32 | E6 | Notify families of a closure | As a caregiver, I want to be notified when a service I rely on closes, so that I can plan an alternative. | Won't (this time) | 5 |
+
+## Cross-cutting (every release)
+
+| ID | Epic | Title | User Story Description | Priority (MoSCoW) | Estimate (Pts) |
+| ---| ---| ---| ---| ---| --- |
+| US33 | E7 | Accessible, mobile-first UI | As an older caregiver, I want large text, high contrast and large touch targets across the application, so that I can navigate easily despite visual or digital literacy barriers. | Must | 5 |
+| US34 | E7 | Data minimisation | As a caregiver, I want the platform not to require mandatory medical documents, so that I only share what is necessary. | Must | 2 |
+| US35 | E8 | Backend unit tests (at least 80% coverage) | As the team, we want automated unit tests with at least 80% backend coverage, so that we can change the system with confidence. | Must | 5 |
+| US36 | E8 | Integration tests of the main flows | As the team, we want integration tests of the main flows (search, support request, provider update), so that we know the components work together. | Must | 3 |
+| US37 | E8 | CI/CD, structured logs, health checks and metrics | As the team, we want CI/CD, structured logs, health checks and metrics, so that we can deploy and monitor the system reliably. | Must | 5 |
+| US38 | E8 | Failure handling and one demonstrated failure | As the team, we want the system to handle failures gracefully and to demonstrate one failure scenario, so that we show how it degrades safely. | Must | 5 |
+| US39 | E6 | Choose the external data source (to decide) | As the team, we want to decide which external data source to integrate, so that we can plan the integration. | Must | 2 |
+| US40 | E6 | Integrate the external data source | As the platform, I want to integrate the chosen external data source, so that service information is enriched beyond provider updates. | Must | 5 |
+
+> US39 is a short decision task (spike); the external data source has not been decided yet.
+
+## Summary by epic
+
+| Epic | Stories |
+| ---| --- |
+| E1 Access and care profile | US01, US02, US03, US04, US17, US26, US27 |
+| E2 Find an alternative | US05, US18, US19 |
+| E3 AI-assisted navigation | US06, US07, US08, US09 |
+| E4 Check and confirm | US10, US11, US20, US28, US29 |
+| E5 Support network | US12, US13, US14, US21, US22, US30, US31 |
+| E6 Service information | US15, US16, US23, US24, US25, US32, US39, US40 |
+| E7 Inclusive, privacy-first design | US33, US34 |
+| E8 Quality and operations | US35, US36, US37, US38 |
 
 # Acceptance Criteria
-Below are the acceptance criteria formatted in Given / When / Then for key backlog items.
-### US02 — Simplified Care Profile
+Acceptance criteria (Given / When / Then) for the Release 1 stories. Stories without criteria still have to be defined before they meet the DoR.
 
-```json
+### US01 / US02: Log in and restrict features by role
+_To be defined._
+
+### US03 / US04: Care profile and emergency contacts
+
+```gherkin
 Given the informal caregiver is authenticated in the platform,
-When they access the dashboard and create/edit the care profile,
+When they create or edit the care profile and emergency contacts,
 Then the system must allow saving only essential, non-sensitive information (e.g., accessibility tag "requires wheelchair access", emergency contacts),
 And MUST NOT require or request mandatory uploads of sensitive medical documents.
 ```
 
-###   
+### US05: Search services by type and location
 
-### US03 — Local Service Search & Filters
-
-```json
+```gherkin
 Given the caregiver is on the service search screen,
-When they apply filters by service type, location/distance, accessibility needs, or status,
+When they search by service type and location,
 Then the system returns a list of relevant services sorted by proximity/relevance,
 And each result displays the service name, location, data source, verification state, and last update timestamp.
 ```
 
-###   
+### US06 / US07 / US08: Plain-language search and AI guardrails
 
-### US04 — Service Detail with Direct Call (Human Fallback)
-
-```json
-Given the caregiver selects a service result from the search,
-When they view the service detail page,
-Then the screen must display a prominent "Call / Contact" button that directly triggers a telephone call on the device,
-And displays a clear disclaimer: "Real-time availability is not guaranteed. Please confirm directly via phone call."
-```
-
-###   
-
-### US05 — Fast Updates by Verified Entities
-
-```json
-Given the coordinator (verified service provider) is logged into their institutional account,
-When they update operating status, schedules, or notices for their service and click "Save",
-Then the update must be completed and publicly reflected in less than 1 minute,
-And the status must be marked with an "Official Status" badge, visibly separated from community reports.
-```
-
-###   
-
-### US06 — Support Request Dispatch
-
-```json
-Given the caregiver needs assistance with a care task,
-When they create and send a request specifying WHAT, WHERE, and WHEN to a backup contact (e.g., family member/neighbor),
-Then the recipient receives a notification containing minimal required information,
-And the request is logged on the caregiver's dashboard with a "Pending" status.
-```
-
-###   
-
-### US07 — Support Request Management by Backup Contact
-
-```json
-Given a backup contact receives an assistance request,
-When they view the request and click "Accept" or "Decline",
-Then the request status is immediately updated to "Accepted" or "Declined" on the caregiver's dashboard.
-```
-
-###   
-
-### US08 / US09 — Bounded AI Service Navigator & Safety Guardrails
-
-```json
+```gherkin
 Given the caregiver asks a plain-language question to the AI (e.g., "pharmacies open near Boavista"),
 When the response is generated by the backend API,
-Then the response must be built strictly from verified application service data (Retrieval/RAG),
+Then the response must be built strictly from verified application service data,
 And must include source context and a limitation notice,
 And if the user asks for medical diagnoses, prescriptions, or emergency response, the AI must explicitly refuse and provide local human emergency contacts (e.g., 112 / SNS 24).
 ```
 
-#   
+### US09: Fall back to standard search
+_To be defined._
 
-# Sprint Objectives (2-Sprint Structure)
-The team consists of 4 members (Manuel Sá - PM/DEV, Carlos Lopes - SM/DEV, Filipe Magalhães - BA/DEV, Guilherme Rodrigues - QA/DEV).
-
-```json
-   ┌──────────────────────────────────┐            ┌──────────────────────────────────┐
-   │             SPRINT 1             │            │             SPRINT 2             │
-   │  Core Infra, Search & Provider   │ ─────────► │  Backup Network, Bounded AI &    │
-   │            Updates               │            │       Accessibility / QA         │
-   └──────────────────────────────────┘            └──────────────────────────────────┘
-```
-
-### Sprint 1: Core Architecture, Care Profile, Search & Verified Service Updates
-*   Objective: Establish the layered architecture (Spring Boot + React + PostgreSQL), implement authentication and RBAC, enable caregivers to search local services with direct calling options, and allow verified providers to publish fast status updates.
-*   Included User Stories:
-    *   US01: Authentication & Basic RBAC (5 pts)
-    *   US02: Simplified Care Profile (5 pts)
-    *   US04: Service Detail & Direct Call (3 pts)
-    *   US05: Fast Updates by Verified Entities (5 pts)
-    *   US08: Bounded AI Service (8 pts)
-*   Target Capacity: 26 Story Points
-### Sprint 2: Support Network, Bounded AI, Accessibility & MVP Validation
-*   Objective: Implement the backup support network workflow (accept/decline), integrate the bounded AI navigator isolated in the backend infrastructure layer with safety guardrails, optimize UI accessibility for older users, and achieve test coverage (≥80% backend) for MVP release.
-*   Included User Stories:
-    *   US03: Local Service Search & Filters (8 pts)
-    *   US06: Support Request Dispatch (5 pts)
-    *   US07: Support Request Management (3 pts)
-    *   US09: AI Safety Filters & Guardrails (5 pts)
-    *   US10 & US11: Accessible UI, Quick-Access Dashboard & System QA (5 pts)
-*   Target Capacity: 26 Story Points
-# Initial Release Plan
-The initial release plan focuses on an urban pilot deployment (e.g., Porto / Campanhã / Boavista) to validate core assumptions with informal caregivers and local service providers.
+### US10 / US11: Service details and call button
 
 ```gherkin
-+-----------------------------------------------------------------------------------+
-|                            INITIAL RELEASE ROADMAP                                |
-+------------------------------------------+----------------------------------------+
-|  SPRINT 1: FOUNDATION & DIRECT SEARCH    |  SPRINT 2: AI, NETWORK & RELEASE       |
-+------------------------------------------+----------------------------------------+
-| • Spring Boot + PostgreSQL Architecture  | • Support Request Dispatch Workflow    |
-| • JWT Auth & RBAC (Caregiver/Provider)   | • Bounded AI Navigator (RAG Adapter)   |
-| • Care Profile & Search Engine           | • Accessibility-first React UI        |
-| • Verified Provider Updates (<1 min)     | • Core End-to-End & Unit Tests (≥80%)  |
-| • Direct Call Human Fallback             | • MVP Pilot Deployment                 |
-+------------------------------------------+----------------------------------------+
+Given the caregiver selects a service result from the search,
+When they view the service detail page,
+Then the screen displays the source and the last update of the information,
+And displays a prominent "Call / Contact" button that directly triggers a telephone call on the device,
+And displays a clear disclaimer: "Real-time availability is not guaranteed. Please confirm directly via phone call."
 ```
+
+### US12 / US13 / US14: Send support request, notify contact and retries
+
+```gherkin
+Given the caregiver needs assistance with a care task,
+When they create and send a request specifying WHAT, WHERE, and WHEN to a backup contact (e.g., family member/neighbor),
+Then the recipient receives a notification containing minimal required information,
+And the notification is retried if delivery fails, without creating duplicates.
+```
+
+### US15 / US16: Verify provider and update service status
+
+```gherkin
+Given the coordinator belongs to a verified service provider organisation and is logged into their institutional account,
+When they update operating status, schedules, or notices for their service and click "Save",
+Then the update must be completed and publicly reflected in less than 1 minute,
+And the status must be marked with an "Official Status" badge.
+```
+
+# Release Plan
+The release plan follows the story map. **Allocation of stories to the actual sprints is still to be agreed by the team** (it depends on estimates and on the assignment's sprint requirements). The team consists of 4 members (Manuel Sá - PM/DEV, Carlos Lopes - SM/DEV, Filipe Magalhães - BA/DEV, Guilherme Rodrigues - QA/DEV).
+
+| Release | Goal | Stories |
+| ---| ---| --- |
+| Release 1: Walking skeleton | Thinnest end-to-end version: a caregiver logs in, finds a service (standard or AI search), checks it and calls, and sends a support request; a verified provider updates status. | US01–US16 + cross-cutting (US33–US40): 97 pts |
+| Release 2 | Extend the skeleton: dashboard, filters, expiry warnings, request responses and status, provider validity, correction and audit. | US17–US25: 30 pts |
+| Release n (later) | Later ideas: delegated setup, community reports, multi-recipient requests, closure notifications. | US26–US32: 29 pts |
+
+The initial release focuses on an urban pilot deployment (e.g., Porto / Campanhã / Boavista) to validate core assumptions with informal caregivers and local service providers.
 
 ## Release Evaluation Criteria (Definition of Release)
 1. Search & Action: A caregiver can reach the dashboard, search for a relevant local service, and identify a direct contact action in 3 minutes or less.
@@ -1039,7 +1107,13 @@ Every recommendation includes a limitation notice and a direct contact option fo
 The integration is evaluated through safety and adversarial testing, automated inspection of outbound payloads, verification of recommendations against PostgreSQL, provider-failure testing, and usability testing with caregivers. Acceptance criteria include zero prohibited-data egress, no unsupported service recommendations, and achievement of the target of finding a relevant, verified service alternative within three minutes.
 ### 5.0 Domain Model
 
-[domain\_model\_mvp.svg](https://t90122138845.p.clickup-attachments.com/t90122138845/36273a7a-7860-4867-be66-d580855ed3d2/domain_model_mvp.svg)
+[domainmodel.svg](https://t90122138845.p.clickup-attachments.com/t90122138845/0de68449-5b2c-41d4-be47-39f7d93d90ff/domainmodel.svg)
+
+[domainmodel.puml](https://t90122138845.p.clickup-attachments.com/t90122138845/6f0cbb89-df47-4e9f-982f-9bff96a0da4a/domainmodel.puml)
+
+[domainmodel-simple.svg](https://t90122138845.p.clickup-attachments.com/t90122138845/8efc3bf0-7c95-45c8-97c7-2b10effcdd25/domainmodel-simple.svg)
+
+[domainmodel-simple.puml](https://t90122138845.p.clickup-attachments.com/t90122138845/056c0ff2-1dd0-4168-990b-0d6fe351a1d7/domainmodel-simple.puml)
 
 # Architectural Decision Records
 
@@ -1981,66 +2055,71 @@ To ensure compliance with GDPR storage limitation requirements:
 # Operating Costs Estimation
 
 ## 1\. Objective and Scope
-This estimation evaluates the costs of developing, testing and demonstrating the Support Network for Informal Caregivers MVP over two sprints.
+This estimation evaluates the costs of developing, testing and demonstrating the Support Network for Informal Caregivers MVP (CareBnb) over two sprints.
 The project consists of four team members combining development with project management, Scrum, business analysis and quality assurance responsibilities. The solution uses React and Tailwind CSS for the frontend, Java and Spring Boot for the backend, PostgreSQL for persistent data, and an AI service for bounded natural-language navigation.
 The estimate separates three cost categories:
-1. **Direct project expenses:** hosting, database, AI API usage and development tools.
-2. **Development labour value:** the estimated monetary value of implementing the backlog, calculated from story points using an explicitly stated planning assumption.
-3. **Labour contingency:** an additional 20% of the estimated labour value to account for bugs, integration problems and additional development work.
+*   **Direct project expenses:** hosting, database, AI API usage and development tools.
+*   **Development labour value:** the estimated monetary value of implementing the backlog, calculated from story points using an explicitly stated planning assumption.
+*   **Labour contingency:** an additional 20% of the estimated labour value to account for bugs, integration problems and additional development work.
 The calculation covers the MVP project rather than a full year of operation. All amounts are estimates in euros, with provider prices originally published in other currencies converted only approximately where necessary. Taxes and currency fluctuations are excluded.
 ## 2\. Development Backlog and Story Points
-The backlog contains 11 user stories covering the essential functionality of the MVP.
+The MVP scope is the **Release 1 (walking skeleton)** stories plus the **cross-cutting** items, all prioritised as _Must_ in the product backlog. This is 24 user stories and 97 story points. Release 2 and later stories are outside this estimate.
 
-| ID | Backlog item | Story points |
-| ---| ---| --- |
-| US01 | Authentication and Basic RBAC | 5 |
-| US02 | Simplified Care Profile | 5 |
-| US03 | Local Service Search and Filters | 8 |
-| US04 | Service Detail and Direct Call | 3 |
-| US05 | Fast Updates by Verified Entities | 5 |
-| US06 | Support Request Dispatch | 5 |
-| US07 | Support Request Management | 3 |
-| US08 | Bounded AI Service Navigator | 8 |
-| US09 | AI Safety Filters and Guardrails | 5 |
-| US10 | Accessible and Mobile-First UI | 5 |
-| US11 | Quick-Access Care Dashboard | 5 |
-| Total | 11 user stories | 57 SP |
+| ID | Epic | User story | Story points |
+| ---| ---| ---| --- |
+| US01 | E1 | Log in as caregiver or provider | 5 |
+| US02 | E1 | Restrict features by role | 3 |
+| US03 | E1 | Create basic care profile | 3 |
+| US04 | E1 | Manage emergency contacts | 3 |
+| US05 | E2 | Search services by type and location | 5 |
+| US06 | E3 | Ask a question in plain language | 3 |
+| US07 | E3 | Answer built only from verified service data | 5 |
+| US08 | E3 | AI guardrails | 5 |
+| US09 | E3 | Fall back to standard search if AI is unavailable | 3 |
+| US10 | E4 | View service details | 3 |
+| US11 | E4 | Call button with "confirm by phone" notice | 2 |
+| US12 | E5 | Send support request | 5 |
+| US13 | E5 | Notify contact asynchronously | 5 |
+| US14 | E5 | Retry failed notifications without duplicates | 5 |
+| US15 | E6 | Verify provider organisation | 5 |
+| US16 | E6 | Update service status in under a minute | 5 |
+| US33 | E7 | Accessible, mobile-first UI | 5 |
+| US34 | E7 | Data minimisation | 2 |
+| US35 | E8 | Backend unit tests (at least 80% coverage) | 5 |
+| US36 | E8 | Integration tests of the main flows | 3 |
+| US37 | E8 | CI/CD, structured logs, health checks and metrics | 5 |
+| US38 | E8 | Failure handling and one demonstrated failure | 5 |
+| US39 | E6 | Choose the external data source (to decide) | 2 |
+| US40 | E6 | Integrate the external data source | 5 |
+|  |  | Total | 97 |
 
 ## 3\. Development Labour Value
-Story points measure relative complexity, effort and uncertainty; they do not have a universal monetary value. To estimate the economic value of the work, this report uses an explicit planning assumption of **four team-hours per story point** and an illustrative labour rate of **€15 per hour**.
+Story points measure relative complexity, effort and uncertainty; they do not have a universal monetary value. To estimate the economic value of the work, this report uses an explicit planning assumption of four team-hours per story point and an illustrative labour rate of €15 per hour.
 These values are assumptions for budgeting, not measured productivity or an agreed salary. Actual labour value should be recalculated using recorded team hours and an agreed rate if available.
 ### Calculation
 
-| Parameter | Assumption |
+| Item | Value |
 | ---| --- |
-| Team members | 4 |
-| Total backlog | 57 SP |
-| Planning effort per story point | 4 team-hours |
-| Estimated total effort | 228 team-hours |
-| Illustrative labour rate | €15/hour |
-| Estimated labour value | €3,420.00 |
+| Story points | 97 SP |
+| Hours per story point | 4 h |
+| Hourly rate | €15 |
 
 The calculation is:
-*   Estimated effort = 57 SP × 4 hours/SP = **228 hours**
-*   Labour value = 228 hours × €15/hour = **€3,420.00**
-For a four-person team, this represents an average of 57 hours per person across the project if effort is distributed equally. Actual effort will vary according to responsibilities, implementation complexity and testing requirements.
+*   Estimated effort = 97 SP × 4 hours/SP = **388 hours**
+*   Labour value = 388 hours × €15/hour = **€5,820.00**
+For a four-person team, this represents an average of 97 hours per person across the project if effort is distributed equally. Actual effort will vary according to responsibilities, implementation complexity and testing requirements.
 This labour value represents the economic value of the development work. Since the project is an academic exercise and the team is assumed not to receive salaries, it is not necessarily a direct cash expense.
 ## 4\. Infrastructure and Hosting Costs
 The application requires a frontend deployment, two independently deployable Spring Boot backend components and a PostgreSQL database. To keep the MVP affordable, the initial estimate assumes GitHub for source control and automation, static hosting for React, and low-cost or free hosting for the backend and database.
 
-| Component | Selected plan or approach | Estimated project cost | Justification |
-| ---| ---| ---| --- |
-| Source code and version control | GitHub Free | €0.00 | Supports repository management, collaboration and version control. |
-| Frontend hosting | GitHub Pages, if compatible with the repository and project setup | €0.00 | React can be built into static files and published as a static website. |
-| Backend hosting | Render Free for two Spring Boot services, if suitable | €0.00 assumed | Allows an initial deployment without committing to paid compute. Free services may sleep or have resource limitations, so this is suitable mainly for a demonstration. |
-| PostgreSQL | Supabase Free | €0.00 assumed | Provides a hosted PostgreSQL database within free-tier limits. The documented free plan includes a 500 MB database limit and can pause inactive projects. |
-| Asynchronous workflow | In-process background worker or database-backed queue | €0.00 additional assumed | Avoids the cost and deployment complexity of a separate message broker for the initial MVP. |
-| Email notifications | Free-tier provider or simulated notification during testing | €0.00 assumed | Avoids a paid messaging service unless actual notification delivery requires one. |
-| Domain name | Provider-generated deployment URL | €0.00 | A custom domain is not necessary for the academic demonstration. |
-| Monitoring and backups | Free tooling and database export during development | €0.00 additional assumed | Basic diagnostics and manual backups are sufficient for a limited demonstration, but not necessarily for a production service. |
-| Estimated infrastructure total |  | €0.00 | Assumes free-tier eligibility and that their restrictions are acceptable. |
+| Component | Assumed solution | Estimated cost |
+| ---| ---| --- |
+| Source control and automation | GitHub / GitHub Actions | €0 (to verify) |
+| Frontend (React) | GitHub Pages (static hosting) | €0 |
+| Backend (two Spring Boot components) | Free or low-cost hosting (e.g., Render) | €0 (to verify) |
+| Database (PostgreSQL) | Free tier (e.g., Supabase) | €0 (to verify) |
 
-### Provider references
+**Provider references**
 *   GitHub Pages: [https://pages.github.com/](https://pages.github.com/)
 *   GitHub Actions billing: [https://docs.github.com/en/billing/concepts/product-billing/github-actions](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 *   Render compute plans: [https://render.com/docs/compute-plans](https://render.com/docs/compute-plans)
@@ -2048,45 +2127,33 @@ The application requires a frontend deployment, two independently deployable Spr
 GitHub Pages only serves static websites; it cannot execute Spring Boot applications or host PostgreSQL directly. The backend components and database therefore need suitable external hosting. GitHub Actions can automate builds and deployments, but its usage limits and billing depend on the repository and account plan.
 The €0 infrastructure estimate is conditional, not a guarantee. Free hosting may introduce sleeping services, limited compute, database pausing or other restrictions. The team should verify these limits before the final demonstration.
 ### Paid-hosting alternative
-If free backend hosting proves unreliable, a paid backend plan can be considered. For example, Render's documentation identifies a small paid web-service plan with 0.5 CPU and 512 MB RAM under its current plan naming. The actual price should be checked on its [official pricing page](https://render.com/pricing) before committing.
-If a paid instance costs (P) euros per month and two backend components each require an instance for one billed month, the additional cost is:
-**Additional backend cost = 2 × P × number of billed months**
+If free backend hosting proves unreliable, a paid backend plan can be considered. For example, Render's documentation identifies a small paid web-service plan with 0.5 CPU and 512 MB RAM under its current plan naming. The actual price should be checked on its official pricing page before committing.
+If a paid instance costs P euros per month and two backend components each require an instance for one billed month, the additional cost is:
+> Additional backend cost = 2 × P × number of billed months
 This is a contingency scenario and is not included in the baseline budget because the exact selected plan and billing period have not yet been confirmed.
 ## 5\. AI API Costs
-The Bounded AI Service Navigator allows caregivers to ask natural-language questions about support services. During development, the team will need to test prompt construction, retrieval from verified service data, source context, refusal behaviour and concise responses.
+The plain-language search (bounded AI navigator) allows caregivers to ask natural-language questions about support services. During development, the team will need to test prompt construction, retrieval from verified service data, source context, refusal behaviour and concise responses.
 GitHub Copilot and the application's AI API are separate services. Copilot assists developers while coding; the application API is used when the running platform answers caregiver questions.
 ### Token assumptions
 For budgeting, assume the team performs 500 AI test requests during implementation and demonstration.
 
-| Parameter | Assumption |
+| Item | Value |
 | ---| --- |
-| Total test requests | 500 |
-| Average input tokens per request | 1,500 |
-| Average output tokens per request | 500 |
-| Total input tokens | 750,000 |
-| Total output tokens | 250,000 |
+| AI test requests | 500 |
+| Input tokens per request | \[to be filled in from the original table\] |
+| Output tokens per request | \[to be filled in from the original table\] |
 
 For an illustrative model-price reference, the official OpenAI API pricing page lists GPT-6 Luna at $0.10 per million input tokens and $0.50 per million output tokens for standard short-context processing. Prices and model availability should be verified when the project selects its provider.
 Reference: [https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)
 ### Calculation
-
-| Component | Calculation | Estimated cost |
-| ---| ---| --- |
-| Input tokens | 750,000 / 1,000,000 × $0.10 | $0.075 |
-| Output tokens | 250,000 / 1,000,000 × $0.50 | $0.125 |
-| Total estimated model usage |  | $0.20 |
-
 The calculation gives an illustrative total of **$0.20**, before any applicable taxes, currency conversion or additional services. A project budget of **€5.00** is allocated for AI API usage to allow for additional prompt iterations, repeated tests, and usage beyond the initial estimate.
 This €5.00 is a budget allowance, not a prediction that the API will consume the full amount. Costs can increase if the team uses a more expensive model, sends longer retrieved contexts, tests more requests, or adds embedding or other paid services.
 ## 6\. Development Tools
 
-| Tool | Estimated project cost | Justification |
+| Tool | Assumption | Estimated cost |
 | ---| ---| --- |
-| GitHub Free | €0.00 | Source control and collaboration for the four-person team. |
-| GitHub Actions | €0.00 assumed | Build and deployment automation within the applicable free usage allowance. |
-| GitHub Copilot Student | €0.00 assumed | Verified eligible students can access the student benefit without an additional subscription charge, subject to plan conditions and usage limits. |
-| React, Tailwind CSS, Java, Spring Boot and Maven | €0.00 | These are open-source technologies with no required software licence fee for this project. |
-| Total development-tool cost | €0.00 | Assumes eligible student accounts and free-tier usage. |
+| GitHub Copilot | Student access for the four team members | €0 |
+| GitHub Actions | Within included usage limits | €0 |
 
 Official references:
 *   GitHub Copilot Student: [https://docs.github.com/en/copilot/how-tos/copilot-on-github/set-up-copilot/enable-copilot/set-up-for-students](https://docs.github.com/en/copilot/how-tos/copilot-on-github/set-up-copilot/enable-copilot/set-up-for-students)
@@ -2095,40 +2162,105 @@ Any paid Copilot subscription, overage charge or paid development service should
 ## 7\. Direct Project Expense Summary
 The baseline cash budget includes the planned AI allowance and assumes free infrastructure and development tools.
 
-| Cost category | Estimated project cost |
+| Category | Estimated cost |
 | ---| --- |
 | Infrastructure and hosting | €0.00 |
-| AI API allowance | €5.00 |
+| AI API usage (allowance) | €5.00 |
 | Development tools | €0.00 |
-| Development labour cash cost | €0.00 |
-| Estimated direct cash budget | €5.00 |
+| Total direct cash budget | €5.00 |
 
 The direct cash estimate is low because the project is assumed to use free plans and unpaid student labour. It is not a quote for a production-ready deployment. Paid backend hosting, a paid database, a custom domain or other services would increase this figure.
-## 8\. Labour Contingency — 20%
-A contingency of 20% is applied specifically to the estimated labour value, as required. This reserve accounts for bugs, integration issues, additional testing, security fixes and small changes discovered during implementation.
+## 8\. Labour Contingency (20%)
+A contingency of 20% is applied specifically to the estimated labour value. This reserve accounts for bugs, integration issues, additional testing, security fixes and small changes discovered during implementation.
 ### Calculation
 
-| Item | Calculation | Amount |
-| ---| ---| --- |
-| Estimated labour value | 228 hours × €15/hour | €3,420.00 |
-| Labour contingency | €3,420.00 × 20% | €684.00 |
-| Labour value including contingency | €3,420.00 + €684.00 | €4,104.00 |
+| Item | Value |
+| ---| --- |
+| Estimated labour value | €5,820.00 |
+| Contingency rate | 20% |
+| Labour contingency | €1,164.00 |
+| Labour value with contingency | €6,984.00 |
 
 The contingency is a planning reserve rather than a guaranteed expense. If additional work increases the number of story points, the team should revisit the estimate and determine whether the extra work fits within the existing schedule and capacity.
 The contingency does not automatically cover additional paid hosting or API usage; those are separate cash expenses and should be revised if the project's technical requirements change.
 ## 9\. Final Project Cost Estimate
 To avoid confusing economic labour value with actual spending, the project budget is presented in two parts.
 
-| Budget view | Calculation | Estimated amount |
-| ---| ---| --- |
-| Direct cash expenses | Hosting, tools and AI allowance | €5.00 |
-| Labour value | 57 SP × 4 hours/SP × €15/hour | €3,420.00 |
-| Labour contingency | 20% of labour value | €684.00 |
-| Total estimated project economic value | €5.00 + €3,420.00 + €684.00 | €4,109.00 |
+| Part | Amount |
+| ---| --- |
+| Direct cash budget | €5.00 |
+| Labour value | €5,820.00 |
+| Labour contingency (20%) | €1,164.00 |
+| Estimated economic value of the project | €6,989.00 |
 
-The **estimated direct cash budget is €5.00**, assuming free infrastructure and tools. The **estimated economic value of the project, including labour and the 20% labour contingency, is €4,109.00**.
+The estimated direct cash budget is €5.00, assuming free infrastructure and tools. The estimated economic value of the project, including labour and the 20% labour contingency, is €6,989.00.
 These are different measures: the first represents expected out-of-pocket expenditure under the assumptions; the second also assigns a notional monetary value to the team's development effort.
 ## 10\. Conclusion
 The Support Network for Informal Caregivers MVP can potentially be developed and demonstrated with very low direct cash expenditure by using GitHub, free hosting tiers, open-source technologies and eligible GitHub Copilot Student access.
-The main project resource is development effort, estimated at 228 team-hours for 57 story points under the stated planning assumption. At an illustrative rate of €15 per hour, this represents €3,420 in labour value. The 20% labour contingency adds €684, producing an estimated labour value of €4,104 before the direct cash expenses are added.
+The main project resource is development effort, estimated at 388 team-hours for 97 story points under the stated planning assumption. At an illustrative rate of €15 per hour, this represents €5,820 in labour value. The 20% labour contingency adds €1,164, producing an estimated labour value of €6,984 before the direct cash expenses are added.
 The estimate should be updated when the team confirms the sprint allocation, selects the hosting providers, measures actual effort, and records AI token consumption. Free-tier restrictions must be evaluated against the project's deployment, reliability, privacy and demonstration requirements.
+
+# Non-Functional Requirements
+
+# Main Non-Functional Requirements — CareBnB (FURPS+)
+* * *
+## F — Functionality
+
+| ID | Requirement | Source |
+| ---| ---| --- |
+| F-01 | Backend-enforced authentication and RBAC. Authentication (JWT/Spring Security) and role-based access control with least privilege are enforced by the backend; users can only access their own care data and support requests. | Success Criteria §4; ADR-007; Security Assessment §3 |
+| F-02 | Data minimisation and no PHI. Collect only the minimum necessary; no mandatory medical-document upload; care needs expressed as non-sensitive tags only. | Success Criteria §4; MVP §4; US34; Security Assessment §2 |
+| F-03 | No sensitive data to the LLM. Only Tier 3 (non-sensitive public/operational) data may reach the external LLM; Tier 1 and Tier 2 data must never leave the system (allowlists, payload validation, Data Scrubber). | Security Assessment §2, §4; Technical Design §4.2 |
+| F-04 | Bounded and grounded AI. The AI only retrieves and summarises verified application data; it must not invent service facts, give medical advice or make emergency decisions. Medical/emergency queries are redirected to 112 / SNS 24. | Success Criteria §3; Responsible AI §1, §4; ADR-009 |
+| F-05 | Trust signals on every result. Every result shows its source, verification state (Official vs community) and last-update time, and never presents availability as a guarantee. | Success Criteria §2.3; MVP §3B; US10 |
+| F-06 | Human fallback. Every service result and AI recommendation includes a prominent "Call / Contact" action and a limitation notice. | Success Criteria §2.3, §3; MVP §4; US11 |
+| F-07 | Encryption and audit. Data protected in transit (HTTPS) and at rest where appropriate; immutable audit logging of status updates and role changes; logs must not expose sensitive content. | Success Criteria §4; ADR-010; Security Assessment §1 |
+
+* * *
+## U — Usability
+
+| ID | Requirement | Source |
+| ---| ---| --- |
+| U-01 | Mobile-first, accessible UI. Large text, high contrast, clear focus states, large touch targets, simple language and few steps. | Success Criteria §2.2; MVP §4; US33 |
+| U-02 | Not digital-only. A human/phone alternative must exist at every critical point; onboarding is short and requires no medical documents. | Success Criteria §2.2; MVP §4 |
+| U-03 | Task-success targets. ≥ 80% complete the search task unaided; ≥ 90% identify the next action; ≥ 80% complete the support-request flow; ≥ 80% of older users complete a search or contact task. | Success Criteria §2.1, §2.2; MVP §7 |
+
+* * *
+## R — Reliability
+
+| ID | Requirement | Source |
+| ---| ---| --- |
+| R-01 | Graceful degradation. Failure of the Support Assistant Service or LLM provider must not block core platform operations; if the AI is unavailable, the user falls back to standard search/filters. | ADR-011; Responsible AI §5; US09 |
+| R-02 | No fabricated results on failure. Bounded timeouts and limited retries; the system must not invent answers or present unverified/cached data as confirmed availability. | ADR-011 |
+| R-03 | Idempotent asynchronous notifications. Support-request notifications are sent asynchronously, retried on failure, and never duplicated. | Technical Design §2; US13; US14; ADR-011 |
+| R-04 | Offline access to emergency contacts, care profile and basic routines during network or power disruptions. | Responsible AI §5; Technical Design §4.4 |
+
+* * *
+## P — Performance
+
+| ID | Requirement | Source |
+| ---| ---| --- |
+| P-01 | Find an alternative fast. Median time from opening the dashboard to a relevant result ≤ 3 minutes. | Success Criteria §2.1; MVP §7; Journey 1 |
+| P-02 | Fast provider updates. A verified provider can publish a status update in under 1 minute, and it is publicly reflected within that time. | Success Criteria §5; US16; Release Evaluation Criteria |
+
+> The documentation defines no technical performance targets (API latency, throughput, concurrent users, availability %).
+* * *
+## S — Supportability
+
+| ID | Requirement | Source |
+| ---| ---| --- |
+| S-01 | Automated testing. Core business rules covered by automated tests, with ≥ 80% coverage on new backend code, plus integration tests of the main flows. | Success Criteria §6; US35; US36; Definition of Done |
+| S-02 | CI/CD and observability. CI/CD, structured logs, health checks per component and metrics. | US37; ADR-004; ADR-011 |
+| S-03 | Layered, loosely coupled architecture. Traditional layered architecture inside each backend component; components communicate only through versioned API contracts; external integrations (e.g. the LLM) behind replaceable adapters. | ADR-003; ADR-004; ADR-008; ADR-012 |
+
+* * *
+## \+ Constraints
+
+| ID | Type | Requirement | Source |
+| ---| ---| ---| --- |
+| D-01 | Design | Tech stack: React + Tailwind CSS (frontend), Java/Spring Boot/Maven (backend), PostgreSQL (system of record), managed external LLM API. | ADR-001, 002, 006, 008 |
+| D-02 | Design | Two independently deployable backends (Care Platform API and Support Assistant Service); the assistant never accesses the core database directly, and the frontend never calls the LLM directly. | ADR-004; ADR-006; MVP §4 |
+| N-01 | Interface | REST over HTTPS (JSON, `/api/v1`) between frontend and backends; asynchronous messaging only where justified. | Technical Design §1; ADR-005 |
+| I-01 | Implementation | Team process: Scrum; every change via pull request with ≥ 1 reviewer; Definition of Ready/Done respected. | Team Methodology §2–4 |
+| PH-01 | Physical | Low-cost deployment: free/low-cost hosting assumed (GitHub Pages for the frontend, external hosting for backends and database); direct cash budget €5.00. Free-tier limits must be verified before the final demo. | Operating Costs §4, §7 |
+| L-01 | Legal | GDPR compliance with defined consent, retention and deletion rules (e.g. accounts deleted within 30 days of request, support requests purged 30 days after resolution, zero data retention at the LLM provider). | Success Criteria §4; ADR-010; Security Assessment §5 |
