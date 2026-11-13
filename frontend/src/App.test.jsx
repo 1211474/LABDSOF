@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import App from './App.jsx'
 
 const services = [
@@ -38,5 +38,38 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
       .toHaveAttribute('href', 'tel:+351220000001')
     expect(screen.getByText('Fonte oficial verificada')).toBeInTheDocument()
+  })
+
+  it('sends a plain-language question and renders the navigator answer', async () => {
+    const navigatorResponse = {
+      answer:
+        'Encontrei 1 resultado para farmácias com estado aberto perto de Boavista. ' +
+        'Farmácia da Boavista (Boavista; estado: aberto; horário: 08:00 - 22:00; telefone: +351220000001).',
+      services,
+      isFallback: true,
+      limitations: ['A disponibilidade em tempo real não é garantida.']
+    }
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => services })
+      .mockResolvedValueOnce({ ok: true, json: async () => navigatorResponse })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+
+    fireEvent.change(screen.getByLabelText(/qual é a sua necessidade/i), {
+      target: { value: 'farmácias abertas perto da Boavista' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /procurar ajuda/i }))
+
+    expect(await screen.findByText(/Encontrei 1 resultado para farmácias/i)).toBeInTheDocument()
+    expect(screen.getByText(/a pergunta foi interpretada por palavras-chave/i)).toBeInTheDocument()
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/v1/ai/navigate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ query: 'farmácias abertas perto da Boavista' })
+      })
+    )
   })
 })

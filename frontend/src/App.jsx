@@ -163,7 +163,7 @@ export default function App() {
             <p className="font-semibold">{assistantResult.answer}</p>
             {assistantResult.isFallback ? (
               <p className="mt-2 text-sm font-semibold text-amber-900">
-                Modo de contingência: o assistente de IA ainda não está ativo. Foram usados dados do diretório.
+                Modo de contingência: a pergunta foi interpretada por palavras-chave sobre os dados do diretório.
               </p>
             ) : null}
             {assistantResult.services?.length ? (
