@@ -212,6 +212,37 @@ class AiNavigatorServiceTest {
     }
 
     @Test
+    void excludesServicesFromUnverifiedOrganisations() {
+        CareServiceDto verifiedPharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+        CareServiceDto unverifiedPharmacy = service(
+                "Farmácia Não Verificada", "PHARMACY", "Boavista", "OPEN", false);
+
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull()))
+                .thenReturn(List.of(verifiedPharmacy, unverifiedPharmacy));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.services()).containsExactly(verifiedPharmacy);
+        assertThat(response.answer()).contains("Encontrei 1 resultado");
+    }
+
+    @Test
+    void doesNotPresentUnverifiedServicesAsResults() {
+        CareServiceDto unverifiedService = service(
+                "Apoio ao Domicílio dos Vizinhos", "HOME_SUPPORT", "Boavista", "OPEN", false);
+
+        when(carePlatformClient.fetchServices(eq("HOME_SUPPORT"), isNull()))
+                .thenReturn(List.of(unverifiedService));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("apoio ao domicílio perto da Boavista");
+
+        assertThat(response.services()).isEmpty();
+        assertThat(response.answer())
+                .contains("Não encontrei")
+                .contains("apoio ao domicílio");
+    }
+
+    @Test
     void throwsControlledExceptionWhenCarePlatformIsUnavailable() {
         when(carePlatformClient.fetchServices(isNull(), isNull()))
                 .thenThrow(new ResourceAccessException("connection refused"));
@@ -221,6 +252,11 @@ class AiNavigatorServiceTest {
     }
 
     private static CareServiceDto service(String name, String type, String location, String status) {
+        return service(name, type, location, status, true);
+    }
+
+    private static CareServiceDto service(
+            String name, String type, String location, String status, boolean verified) {
         return new CareServiceDto(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -230,7 +266,7 @@ class AiNavigatorServiceTest {
                 "09:00 - 18:00",
                 status,
                 "+351220000001",
-                true,
+                verified,
                 Instant.parse("2026-10-12T15:30:00Z")
         );
     }

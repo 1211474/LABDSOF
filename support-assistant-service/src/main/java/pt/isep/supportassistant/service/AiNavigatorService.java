@@ -60,6 +60,7 @@ public class AiNavigatorService {
         String requestedLocation = QueryText.normalize(assistantQuery.location());
 
         return services.stream()
+                .filter(CareServiceDto::verified)
                 .filter(service -> requestedLocation.isEmpty()
                         || requestedLocation.equals(QueryText.normalize(service.coarseLocation())))
                 .filter(service -> matchesStatus(service, assistantQuery.status()))

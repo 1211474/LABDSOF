@@ -70,7 +70,8 @@ curl -X POST http://localhost:8081/api/v1/ai/navigate \
 ```
 
 The response contains a readable `answer`, the matching `services`, a `limitations` list and an
-`isFallback` flag. For example:
+`isFallback` flag. Only services published by verified organisations are returned; services from
+unverified organisations are excluded. For example:
 
 ```json
 {
