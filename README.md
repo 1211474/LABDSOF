@@ -57,6 +57,44 @@ npm run dev
 
 The frontend runs at <http://localhost:5173> and proxies `/api/v1/ai` to port 8081 and other `/api` calls to port 8080.
 
+## Plain-language service navigation (US06)
+
+The Support Assistant Service accepts a caregiver's question in plain language and translates it
+into a service search over the Care Platform directory. The parser recognises Portuguese and
+English service keywords, accent-insensitive locations, and open/closed intent.
+
+```bash
+curl -X POST http://localhost:8081/api/v1/ai/navigate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"farmácias abertas perto da Boavista"}'
+```
+
+The response contains a readable `answer`, the matching `services`, a `limitations` list and an
+`isFallback` flag. Only services published by verified organisations are returned; services from
+unverified organisations are excluded. For example:
+
+```json
+{
+  "answer": "Encontrei 1 resultado para farmácias com estado aberto perto de Boavista. Farmácia da Boavista (Boavista; estado: aberto; horário: 08:00 - 22:00; telefone: +351220000001). Confirme sempre a disponibilidade por telefone antes de se deslocar.",
+  "services": [
+    {
+      "type": "PHARMACY",
+      "coarseLocation": "Boavista",
+      "currentStatus": "OPEN"
+    }
+  ],
+  "isFallback": true,
+  "limitations": [
+    "A disponibilidade em tempo real não é garantida. Confirme sempre diretamente com a instituição."
+  ]
+}
+```
+
+This release uses deterministic keyword interpretation rather than an external LLM, so the
+endpoint is safe to run without AI credentials. The frontend contract is ready to be backed by the
+bounded AI provider later. If the Care Platform API is unavailable, the endpoint returns `503`
+with a `fallbackUrl` pointing to the standard service search.
+
 ## Run the tests
 
 Backend:
