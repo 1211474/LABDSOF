@@ -104,7 +104,11 @@ class ServiceApiIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.role").value("CAREGIVER"));
+                .andExpect(jsonPath("$.role").value("CAREGIVER"))
+                .andExpect(jsonPath("$.permissions").isArray())
+                .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.hasItems(
+                        "SEARCH_SERVICES", "ASK_NAVIGATOR", "MANAGE_SUPPORT_REQUESTS"
+                )));
     }
 
     @Test

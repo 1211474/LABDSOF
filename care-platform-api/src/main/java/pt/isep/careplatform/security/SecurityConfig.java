@@ -30,6 +30,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/caregiver/**").hasRole("CAREGIVER")
+                        .requestMatchers("/api/v1/provider/**").hasRole("PROVIDER")
                         .requestMatchers("/api/v1/services/**", "/actuator/health", "/error").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
