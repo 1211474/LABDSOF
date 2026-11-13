@@ -1,0 +1,247 @@
+{
+  "info": {
+    "_postman_id": "d7a8aa8e-1a0d-4c7f-9f4f-4f3e8b8b2f01",
+    "name": "CareBnB API",
+    "description": "Requests for the CareBnB walking skeleton. Run Login first to populate the JWT variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "carePlatformUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "assistantUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "email",
+      "value": "ana@example.com"
+    },
+    {
+      "key": "password",
+      "value": "password"
+    },
+    {
+      "key": "jwt",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Care Platform health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{carePlatformUrl}}/actuator/health",
+              "host": [
+                "{{carePlatformUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Health endpoint returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as caregiver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{carePlatformUrl}}/api/v1/auth/login",
+              "host": [
+                "{{carePlatformUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('Login returns a JWT and role', function () {",
+                  "    pm.expect(body.token).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.role).to.be.oneOf(['CAREGIVER', 'PROVIDER']);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('jwt', body.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{carePlatformUrl}}/api/v1/auth/me",
+              "host": [
+                "{{carePlatformUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Current user returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Services",
+      "item": [
+        {
+          "name": "List all services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{carePlatformUrl}}/api/v1/services",
+              "host": [
+                "{{carePlatformUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search pharmacies in Boavista",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{carePlatformUrl}}/api/v1/services?type=PHARMACY&coarseLocation=Boavista",
+              "host": [
+                "{{carePlatformUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "PHARMACY"
+                },
+                {
+                  "key": "coarseLocation",
+                  "value": "Boavista"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assistant",
+      "item": [
+        {
+          "name": "Navigate services",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"farmácias perto da Boavista\"\n}"
+            },
+            "url": {
+              "raw": "{{assistantUrl}}/api/v1/ai/navigate",
+              "host": [
+                "{{assistantUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "navigate"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

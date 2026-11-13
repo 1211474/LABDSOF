@@ -15,6 +15,11 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+security:
+  jwt:
+    secret: ${JWT_SECRET:ZGV2LXNlY3JldC1rZXktZm9yLWxvY2FsLWRldmVsb3BtZW50LXVzZQ==}
+    token-lifetime: PT2H
+
 management:
   endpoints:
     web:
@@ -24,3 +29,7 @@ management:
     health:
       probes:
         enabled: true
+
+logging:
+  level:
+    org.springframework.security: DEBUG

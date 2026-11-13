@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { askNavigator, fetchServices } from './api'
+import { askNavigator, fetchCurrentUser, fetchServices, login } from './api'
 
 const SERVICE_TYPES = [
   ['', 'Todos os serviços'],
@@ -46,6 +46,11 @@ function formatDate(value) {
 }
 
 export default function App() {
+  const [authUser, setAuthUser] = useState(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -75,6 +80,41 @@ export default function App() {
   useEffect(() => {
     void loadServices()
   }, [])
+
+  useEffect(() => {
+    const token = window.localStorage.getItem('carebnb.token')
+    if (!token) {
+      return
+    }
+
+    fetchCurrentUser(token)
+      .then(setAuthUser)
+      .catch(() => {
+        window.localStorage.removeItem('carebnb.token')
+      })
+  }, [])
+
+  async function handleLogin(event) {
+    event.preventDefault()
+    setAuthLoading(true)
+    setAuthError('')
+
+    try {
+      const result = await login(email.trim(), password)
+      window.localStorage.setItem('carebnb.token', result.token)
+      setAuthUser({ email: email.trim(), role: result.role })
+      setPassword('')
+    } catch (requestError) {
+      setAuthError(requestError.message)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  function handleLogout() {
+    window.localStorage.removeItem('carebnb.token')
+    setAuthUser(null)
+  }
 
   function handleSearch(event) {
     event.preventDefault()
@@ -106,13 +146,65 @@ export default function App() {
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
       <header className="mb-8">
-        <h1 className="mt-2 text-3xl font-black leading-tight sm:text-4xl">
-          CareBnB
-        </h1>
-        <p className="mt-3 max-w-2xl text-slate-700">
-          Encontre serviços locais de apoio e confirme sempre a disponibilidade por telefone.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="mt-2 text-3xl font-black leading-tight sm:text-4xl">CareBnB</h1>
+            <p className="mt-3 max-w-2xl text-slate-700">
+              Encontre serviços locais de apoio e confirme sempre a disponibilidade por telefone.
+            </p>
+          </div>
+          {authUser ? (
+            <div className="rounded-xl border-2 border-emerald-700 bg-emerald-50 p-3 text-right">
+              <p className="font-semibold">{authUser.email}</p>
+              <p className="text-sm">{authUser.role === 'CAREGIVER' ? 'Cuidador informal' : 'Prestador'}</p>
+              <button className="mt-2 font-bold underline" type="button" onClick={handleLogout}>
+                Terminar sessão
+              </button>
+            </div>
+          ) : null}
+        </div>
       </header>
+
+      {!authUser ? (
+        <section className="mb-8 rounded-2xl border-2 border-sky-800 bg-sky-50 p-5" aria-labelledby="login-title">
+          <h2 id="login-title" className="text-2xl font-bold">Iniciar sessão</h2>
+          <p className="mt-2 text-slate-700">
+            Entre como cuidador ou prestador para aceder às funcionalidades protegidas.
+          </p>
+          <form className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleLogin}>
+            <label>
+              <span className="block font-semibold">Email</span>
+              <input
+                className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                autoComplete="email"
+                required
+              />
+            </label>
+            <label>
+              <span className="block font-semibold">Palavra-passe</span>
+              <input
+                className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <button
+              className="min-h-12 self-end rounded-xl bg-sky-800 px-6 py-3 text-lg font-bold text-white hover:bg-sky-900 disabled:opacity-60"
+              type="submit"
+              disabled={authLoading}
+            >
+              {authLoading ? 'A entrar...' : 'Entrar'}
+            </button>
+          </form>
+          {authError ? <p className="mt-4 font-semibold text-red-950" role="alert">{authError}</p> : null}
+        </section>
+      ) : null}
 
       <section className="mb-8 rounded-2xl border-2 border-sky-800 bg-sky-50 p-5" aria-labelledby="emergency-title">
         <h2 id="emergency-title" className="text-xl font-bold">

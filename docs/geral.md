@@ -72,12 +72,12 @@ A story is Done only when:
 **Situation:** Ana’s regular pharmacy does not have her mother’s medication, or another essential service is no longer available.
 **Goal:** Find a relevant, nearby, and sufficiently reliable alternative in under 3 minutes.
 
-**1.** Ana opens the dashboard and sees the care profile, emergency contacts, and main shortcuts.
-**2.** She selects a need or writes a natural-language question, for example: “pharmacies near Boavista open now”.
-**3.** The system returns alternatives filtered by location, service type, accessibility, and known status.
-**4.** Ana compares the service status, source, last update date, and limitations of the information.
-**5.** She chooses an alternative and confirms directly with the institution using the contact button.
-**6.** If necessary, she starts a support request for someone in her network.
+**1\.** Ana opens the dashboard and sees the care profile, emergency contacts, and main shortcuts.
+**2\.** She selects a need or writes a natural-language question, for example: “pharmacies near Boavista open now”.
+**3\.** The system returns alternatives filtered by location, service type, accessibility, and known status.
+**4\.** Ana compares the service status, source, last update date, and limitations of the information.
+**5\.** She chooses an alternative and confirms directly with the institution using the contact button.
+**6\.** If necessary, she starts a support request for someone in her network.
 
 [journey1\_find\_alternative (1).bpmn](https://t90122138845.p.clickup-attachments.com/t90122138845/94540df3-3b7d-4f68-9760-af25aab72019/journey1_find_alternative%20\(1\).bpmn)
 
@@ -93,12 +93,12 @@ A story is Done only when:
 **Situation:** Ana becomes ill, cannot collect medication, or needs someone to accompany her mother.
 **Goal:** Turn an urgent and vague need into a concrete, limited, and easy-to-accept request.
 
-**1.** Ana selects “Request support” from the dashboard or a service result.
-**2.** She provides only what is necessary: task, location, time window, and contact method.
-**3.** The system shows a preview of what Rui will receive, excluding unnecessary health data.
-**4.** Ana sends the request to one or more people in her support network.
-**5.** Rui receives a specific request and accepts or declines it in a few steps.
-**6.** Ana tracks the request status: pending, accepted, or declined, and decides what to do next.
+**1\.** Ana selects “Request support” from the dashboard or a service result.
+**2\.** She provides only what is necessary: task, location, time window, and contact method.
+**3\.** The system shows a preview of what Rui will receive, excluding unnecessary health data.
+**4\.** Ana sends the request to one or more people in her support network.
+**5\.** Rui receives a specific request and accepts or declines it in a few steps.
+**6\.** Ana tracks the request status: pending, accepted, or declined, and decides what to do next.
 
 **Expected outcome:** The support network receives actionable requests instead of vague group messages, and Ana knows whether the need has been covered.
 
@@ -115,11 +115,11 @@ A story is Done only when:
 **Situation:** Accessible transport cancels his wife’s trip to physiotherapy, or the day centre closes unexpectedly.
 **Goal:** Quickly understand whom to contact and find an alternative without navigating a complex system.
 
-**1.** Armando enters the system through a simple setup, potentially prepared by a family member.
-**2.** On the dashboard, he selects a large, clearly labelled shortcut such as “Transport” or “Day centre”.
-**3.** He sees a small number of alternatives with readable text, high contrast, status, and update date.
-**4.** For each alternative, he selects “Call the institution” or another human contact option.
-**5.** If he cannot find a solution, he asks his network for help or leaves the decision to a delegated family member.
+**1\.** Armando enters the system through a simple setup, potentially prepared by a family member.
+**2\.** On the dashboard, he selects a large, clearly labelled shortcut such as “Transport” or “Day centre”.
+**3\.** He sees a small number of alternatives with readable text, high contrast, status, and update date.
+**4\.** For each alternative, he selects “Call the institution” or another human contact option.
+**5\.** If he cannot find a solution, he asks his network for help or leaves the decision to a delegated family member.
 
 [journey3\_accessibility\_human\_support (1).bpmn](https://t90122138845.p.clickup-attachments.com/t90122138845/93dc4367-f918-4390-b3b5-171d098a55a8/journey3_accessibility_human_support%20\(1\).bpmn)
 
@@ -135,12 +135,12 @@ A story is Done only when:
 **Situation:** A closure, schedule change, vacancy, or temporary change generates repeated calls from families.
 **Goal:** Publish an official update in under one minute, with appropriate accountability and controls.
 
-**1.** Sofia signs in to a verified organisation account.
-**2.** She selects the service and changes its status, availability, schedule, or relevant notice.
-**3.** She confirms the validity period and publishes the update.
-**4.** The system presents the information as “Official status”, with the date and time of the last update.
-**5.** Caregivers see the update distinguished from community reports and can contact the institution directly.
-**6.** Sofia can correct or remove incorrect information.
+**1\.** Sofia signs in to a verified organisation account.
+**2\.** She selects the service and changes its status, availability, schedule, or relevant notice.
+**3\.** She confirms the validity period and publishes the update.
+**4\.** The system presents the information as “Official status”, with the date and time of the last update.
+**5\.** Caregivers see the update distinguished from community reports and can contact the institution directly.
+**6\.** Sofia can correct or remove incorrect information.
 
 [journey4\_service\_information (3).bpmn](https://t90122138845.p.clickup-attachments.com/t90122138845/0e0a88ab-cd50-4aff-aed2-34349701460a/journey4_service_information%20\(3\).bpmn)
 
