@@ -126,4 +126,10 @@ class ServiceApiIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void rejectsUnsupportedUnauthenticatedServiceMutations() throws Exception {
+        mockMvc.perform(post("/api/v1/services"))
+                .andExpect(status().isUnauthorized());
+    }
 }

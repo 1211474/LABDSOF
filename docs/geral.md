@@ -901,8 +901,10 @@ The current role permission policy is:
 | `CAREGIVER` | `SEARCH_SERVICES`, `ASK_NAVIGATOR`, `MANAGE_SUPPORT_REQUESTS` |
 | `PROVIDER` | `MANAGE_SERVICE_STATUS`, `VIEW_SERVICE_DIRECTORY` |
 
-The backend returns these permissions in the login and current-user responses. Endpoint namespaces under
-`/api/v1/caregiver/**` and `/api/v1/provider/**` are restricted to their corresponding role.
+The backend returns these permissions in the login and current-user responses. Access is configured on REST
+resources and HTTP methods, not on role-specific URL namespaces. The public service directory exposes only
+`GET /api/v1/services`; authenticated resource mutations must declare the permitted role when those endpoints
+are implemented.
 
 ### US03 / US04: Care profile and emergency contacts
 
