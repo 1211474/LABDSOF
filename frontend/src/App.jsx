@@ -102,7 +102,7 @@ export default function App() {
     try {
       const result = await login(email.trim(), password)
       window.localStorage.setItem('carebnb.token', result.token)
-      setAuthUser({ email: email.trim(), role: result.role })
+      setAuthUser({ email: email.trim(), role: result.role, permissions: result.permissions ?? [] })
       setPassword('')
     } catch (requestError) {
       setAuthError(requestError.message)
@@ -216,6 +216,7 @@ export default function App() {
         </p>
       </section>
 
+      {authUser?.role !== 'PROVIDER' ? (
       <section className="mb-8 rounded-2xl border-2 border-slate-300 bg-white p-5" aria-labelledby="assistant-title">
         <h2 id="assistant-title" className="text-2xl font-bold">
           Peça ajuda em linguagem simples
@@ -281,6 +282,15 @@ export default function App() {
           </div>
         ) : null}
       </section>
+      ) : (
+        <section className="mb-8 rounded-2xl border-2 border-amber-700 bg-amber-50 p-5" aria-labelledby="provider-access-title">
+          <h2 id="provider-access-title" className="text-xl font-bold">Área de prestador</h2>
+          <p className="mt-2 text-slate-800">
+            A pesquisa pública de serviços está disponível. As ferramentas de atualização de estado do prestador
+            serão disponibilizadas nesta área quando estiverem configuradas.
+          </p>
+        </section>
+      )}
 
       <section className="mb-8" aria-labelledby="search-title">
         <h2 id="search-title" className="text-2xl font-bold">

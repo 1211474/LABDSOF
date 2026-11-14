@@ -875,7 +875,36 @@ Stories are estimated with standard Fibonacci story points (1, 2, 3, 5, 8, 13) a
 Acceptance criteria (Given / When / Then) for the Release 1 stories. Stories without criteria still have to be defined before they meet the DoR.
 
 ### US01 / US02: Log in and restrict features by role
-_To be defined._
+
+```gherkin
+Given a registered user logs in,
+When the platform returns the authenticated session,
+Then it must identify the user's role and the permissions associated with that role.
+
+Given a caregiver is authenticated,
+When they use caregiver features such as the navigator,
+Then the platform must allow those features.
+
+Given a provider is authenticated,
+When they access caregiver-only features,
+Then the platform must not expose those features and the backend must reject caregiver-only endpoints.
+
+Given any user accesses the public service directory,
+When they search for a service,
+Then the search remains available without authentication.
+```
+
+The current role permission policy is:
+
+| Role | Permissions |
+| --- | --- |
+| `CAREGIVER` | `SEARCH_SERVICES`, `ASK_NAVIGATOR`, `MANAGE_SUPPORT_REQUESTS` |
+| `PROVIDER` | `MANAGE_SERVICE_STATUS`, `VIEW_SERVICE_DIRECTORY` |
+
+The backend returns these permissions in the login and current-user responses. Access is configured on REST
+resources and HTTP methods, not on role-specific URL namespaces. The public service directory exposes only
+`GET /api/v1/services`; authenticated resource mutations must declare the permitted role when those endpoints
+are implemented.
 
 ### US03 / US04: Care profile and emergency contacts
 

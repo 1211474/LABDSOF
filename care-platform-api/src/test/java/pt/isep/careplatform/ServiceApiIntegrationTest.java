@@ -104,7 +104,11 @@ class ServiceApiIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.role").value("CAREGIVER"));
+                .andExpect(jsonPath("$.role").value("CAREGIVER"))
+                .andExpect(jsonPath("$.permissions").isArray())
+                .andExpect(jsonPath("$.permissions").value(org.hamcrest.Matchers.hasItems(
+                        "SEARCH_SERVICES", "ASK_NAVIGATOR", "MANAGE_SUPPORT_REQUESTS"
+                )));
     }
 
     @Test
@@ -120,6 +124,12 @@ class ServiceApiIntegrationTest {
     @Test
     void rejectsUnauthenticatedCurrentUserRequests() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectsUnsupportedUnauthenticatedServiceMutations() throws Exception {
+        mockMvc.perform(post("/api/v1/services"))
                 .andExpect(status().isUnauthorized());
     }
 }
