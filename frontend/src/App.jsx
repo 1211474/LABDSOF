@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { askNavigator, fetchCurrentUser, fetchServices, login } from './api'
+import {
+  addCareRecipient,
+  askNavigator,
+  createCaregiverProfile,
+  fetchCaregiverProfile,
+  fetchCurrentUser,
+  fetchServices,
+  login,
+  removeCareRecipient,
+  updateCareRecipient,
+  updateCaregiverProfile
+} from './api'
 
 const SERVICE_TYPES = [
   ['', 'Todos os serviços'],
@@ -29,6 +40,16 @@ const STATUS_STYLES = {
   UNKNOWN: 'border-slate-600 bg-slate-200 text-slate-950'
 }
 
+const ACCESSIBILITY_TAGS = [
+  ['wheelchair_accessible', 'Acesso para cadeira de rodas'],
+  ['hearing_assistance', 'Apoio auditivo'],
+  ['visual_assistance', 'Apoio visual'],
+  ['mobility_assistance', 'Apoio à mobilidade'],
+  ['cognitive_assistance', 'Apoio cognitivo']
+]
+
+const ACCESSIBILITY_TAG_LABELS = Object.fromEntries(ACCESSIBILITY_TAGS)
+
 function formatDate(value) {
   if (!value) {
     return 'Data desconhecida'
@@ -51,6 +72,18 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [careProfile, setCareProfile] = useState(null)
+  const [profileName, setProfileName] = useState('')
+  const [profilePhone, setProfilePhone] = useState('')
+  const [profileLocation, setProfileLocation] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [profileSuccess, setProfileSuccess] = useState('')
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [recipientName, setRecipientName] = useState('')
+  const [recipientTags, setRecipientTags] = useState([])
+  const [editingRecipientId, setEditingRecipientId] = useState(null)
+  const [recipientError, setRecipientError] = useState('')
+  const [recipientSuccess, setRecipientSuccess] = useState('')
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -88,11 +121,28 @@ export default function App() {
     }
 
     fetchCurrentUser(token)
-      .then(setAuthUser)
+      .then((user) => {
+        setAuthUser(user)
+        if (user.role === 'CAREGIVER') void loadCareProfile()
+      })
       .catch(() => {
         window.localStorage.removeItem('carebnb.token')
       })
   }, [])
+
+  async function loadCareProfile() {
+    try {
+      const profile = await fetchCaregiverProfile()
+      setCareProfile(profile)
+      setProfileName(profile.displayName)
+      setProfilePhone(profile.phoneNumber)
+      setProfileLocation(profile.coarseLocation)
+    } catch (requestError) {
+      if (!requestError.message.includes('não encontrado')) {
+        setProfileError(requestError.message)
+      }
+    }
+  }
 
   async function handleLogin(event) {
     event.preventDefault()
@@ -103,6 +153,7 @@ export default function App() {
       const result = await login(email.trim(), password)
       window.localStorage.setItem('carebnb.token', result.token)
       setAuthUser({ email: email.trim(), role: result.role, permissions: result.permissions ?? [] })
+      if (result.role === 'CAREGIVER') void loadCareProfile()
       setPassword('')
     } catch (requestError) {
       setAuthError(requestError.message)
@@ -114,6 +165,105 @@ export default function App() {
   function handleLogout() {
     window.localStorage.removeItem('carebnb.token')
     setAuthUser(null)
+    setCareProfile(null)
+    setProfileName('')
+    setProfilePhone('')
+    setProfileLocation('')
+    setProfileError('')
+    setProfileSuccess('')
+  }
+
+  function toggleRecipientTag(tag) {
+    setRecipientTags((current) => current.includes(tag)
+      ? current.filter((value) => value !== tag)
+      : [...current, tag])
+  }
+
+  function startEditingRecipient(recipient) {
+    setEditingRecipientId(recipient.id)
+    setRecipientName(recipient.displayName)
+    setRecipientTags(recipient.coarseAccessibilityTags)
+    setRecipientError('')
+    setRecipientSuccess('')
+  }
+
+  function resetRecipientForm() {
+    setEditingRecipientId(null)
+    setRecipientName('')
+    setRecipientTags([])
+  }
+
+  async function handleProfileSubmit(event) {
+    event.preventDefault()
+    setProfileLoading(true)
+    setProfileError('')
+    setProfileSuccess('')
+
+    try {
+      const profile = careProfile
+        ? await updateCaregiverProfile(careProfile.id, {
+          displayName: profileName,
+          phoneNumber: profilePhone,
+          coarseLocation: profileLocation
+        })
+        : await createCaregiverProfile({
+          displayName: profileName,
+          phoneNumber: profilePhone,
+          coarseLocation: profileLocation
+        })
+      setCareProfile(profile)
+      setProfileName(profile.displayName)
+      setProfilePhone(profile.phoneNumber)
+      setProfileLocation(profile.coarseLocation)
+      setProfileSuccess('Perfil guardado com sucesso.')
+    } catch (requestError) {
+      setProfileError(requestError.message)
+    } finally {
+      setProfileLoading(false)
+    }
+  }
+
+  async function handleRecipientSubmit(event) {
+    event.preventDefault()
+    setRecipientError('')
+    setRecipientSuccess('')
+
+    try {
+      const request = {
+        displayName: recipientName.trim(),
+        coarseAccessibilityTags: recipientTags
+      }
+      const recipient = editingRecipientId
+        ? await updateCareRecipient(careProfile.id, editingRecipientId, request)
+        : await addCareRecipient(careProfile.id, request)
+      setCareProfile((current) => ({
+        ...current,
+        recipients: editingRecipientId
+          ? current.recipients.map((item) => item.id === recipient.id ? recipient : item)
+          : [...(current.recipients ?? []), recipient]
+      }))
+      resetRecipientForm()
+      setRecipientSuccess(editingRecipientId ? 'Pessoa acompanhada atualizada.' : 'Pessoa acompanhada adicionada.')
+    } catch (requestError) {
+      setRecipientError(requestError.message)
+    }
+  }
+
+  async function handleRemoveRecipient(recipientId) {
+    if (!window.confirm('Remover esta pessoa acompanhada do perfil?')) return
+    setRecipientError('')
+    setRecipientSuccess('')
+    try {
+      await removeCareRecipient(careProfile.id, recipientId)
+      setCareProfile((current) => ({
+        ...current,
+        recipients: current.recipients.filter((item) => item.id !== recipientId)
+      }))
+      if (editingRecipientId === recipientId) resetRecipientForm()
+      setRecipientSuccess('Pessoa acompanhada removida.')
+    } catch (requestError) {
+      setRecipientError(requestError.message)
+    }
   }
 
   function handleSearch(event) {
@@ -203,6 +353,153 @@ export default function App() {
             </button>
           </form>
           {authError ? <p className="mt-4 font-semibold text-red-950" role="alert">{authError}</p> : null}
+        </section>
+      ) : null}
+
+      {authUser?.role === 'CAREGIVER' ? (
+        <section className="mb-8 rounded-2xl border-2 border-emerald-800 bg-emerald-50 p-5" aria-labelledby="profile-title">
+          <h2 id="profile-title" className="text-2xl font-bold">Perfil do cuidador</h2>
+          <p className="mt-2 text-slate-800">
+            Guarde apenas informação operacional. Não introduza diagnósticos, notas médicas ou documentos.
+          </p>
+
+          <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={handleProfileSubmit}>
+            <label>
+              <span className="block font-semibold">Nome de apresentação</span>
+              <input
+                className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                maxLength={120}
+                required
+              />
+            </label>
+            <label>
+              <span className="block font-semibold">Telefone de contacto</span>
+              <input
+                className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                value={profilePhone}
+                onChange={(event) => setProfilePhone(event.target.value)}
+                placeholder="+351 912 345 678"
+                type="tel"
+                required
+              />
+            </label>
+            <label>
+              <span className="block font-semibold">Zona aproximada</span>
+              <input
+                className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                value={profileLocation}
+                onChange={(event) => setProfileLocation(event.target.value)}
+                placeholder="Ex.: Boavista"
+                maxLength={120}
+                required
+              />
+              <span className="mt-1 block text-sm text-slate-700">Indique apenas bairro ou paróquia, não a morada.</span>
+            </label>
+            <button
+              className="min-h-12 self-end rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900 disabled:opacity-60 sm:col-span-2"
+              type="submit"
+              disabled={profileLoading}
+            >
+              {profileLoading ? 'A guardar...' : careProfile ? 'Atualizar perfil' : 'Criar perfil'}
+            </button>
+          </form>
+
+          {profileError ? <p className="mt-4 font-semibold text-red-950" role="alert">{profileError}</p> : null}
+          {profileSuccess ? <p className="mt-4 font-semibold text-emerald-950" role="status">{profileSuccess}</p> : null}
+
+          {careProfile ? (
+            <form className="mt-6 border-t-2 border-emerald-200 pt-5" onSubmit={handleRecipientSubmit}>
+              <h3 className="text-xl font-bold">
+                {editingRecipientId ? 'Editar pessoa acompanhada' : 'Adicionar pessoa acompanhada'}
+              </h3>
+              <p className="mt-2 text-slate-800">
+                Use um nome curto para a identificar. Guarde apenas necessidades operacionais, sem dados clínicos.
+              </p>
+              <label className="mt-4 block">
+                <span className="block font-semibold">Nome</span>
+                <input
+                  className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                  value={recipientName}
+                  onChange={(event) => setRecipientName(event.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <fieldset className="mt-4">
+                <legend className="font-semibold">Tags de acessibilidade</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {ACCESSIBILITY_TAGS.map(([tag, label]) => (
+                    <label key={tag} className="flex min-h-12 items-center gap-3 rounded-xl border-2 border-slate-400 bg-white px-4 py-2">
+                      <input
+                        className="h-5 w-5"
+                        type="checkbox"
+                        checked={recipientTags.includes(tag)}
+                        onChange={() => toggleRecipientTag(tag)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button
+                className="mt-4 min-h-12 rounded-xl bg-sky-800 px-6 py-3 text-lg font-bold text-white hover:bg-sky-900"
+                type="submit"
+              >
+                {editingRecipientId ? 'Guardar alterações' : 'Adicionar pessoa'}
+              </button>
+              {editingRecipientId ? (
+                <button
+                  className="ml-3 min-h-12 rounded-xl border-2 border-slate-600 px-6 py-3 text-lg font-bold hover:bg-white"
+                  type="button"
+                  onClick={resetRecipientForm}
+                >
+                  Cancelar
+                </button>
+              ) : null}
+              {recipientError ? <p className="mt-3 font-semibold text-red-950" role="alert">{recipientError}</p> : null}
+              {recipientSuccess ? <p className="mt-3 font-semibold text-emerald-950" role="status">{recipientSuccess}</p> : null}
+            </form>
+          ) : null}
+
+          {careProfile?.recipients?.length ? (
+            <div className="mt-5">
+              <h3 className="font-bold">Destinatários configurados</h3>
+              <ul className="mt-2 space-y-2">
+                {careProfile.recipients.map((recipient) => (
+                  <li key={recipient.id} className="rounded-xl border-2 border-emerald-200 bg-white p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold">{recipient.displayName}</p>
+                        <p className="text-sm text-slate-700">
+                          {recipient.coarseAccessibilityTags.length
+                            ? recipient.coarseAccessibilityTags.map((tag) => ACCESSIBILITY_TAG_LABELS[tag] ?? tag).join(', ')
+                            : 'Sem tags de acessibilidade'}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded-lg border-2 border-sky-700 px-3 py-2 font-bold text-sky-900"
+                          type="button"
+                          onClick={() => startEditingRecipient(recipient)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="rounded-lg border-2 border-red-700 px-3 py-2 font-bold text-red-900"
+                          type="button"
+                          onClick={() => void handleRemoveRecipient(recipient.id)}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
