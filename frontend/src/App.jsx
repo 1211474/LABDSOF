@@ -716,9 +716,12 @@ export default function App() {
         </form>
 
         {assistantError ? (
-          <p className="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-950" role="alert">
-            {assistantError} Use a pesquisa de serviços abaixo.
-          </p>
+          <div className="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-950" role="alert">
+            <p>{assistantError}</p>
+            <a className="mt-2 inline-block underline" href="#search-title">
+              Usar a pesquisa normal de serviços
+            </a>
+          </div>
         ) : null}
 
         {assistantResult ? (
@@ -775,7 +778,7 @@ export default function App() {
       )}
 
       <section className="mb-8" aria-labelledby="search-title">
-        <h2 id="search-title" className="text-2xl font-bold">
+        <h2 id="search-title" tabIndex="-1" className="text-2xl font-bold">
           Pesquisar serviços de apoio
         </h2>
 
