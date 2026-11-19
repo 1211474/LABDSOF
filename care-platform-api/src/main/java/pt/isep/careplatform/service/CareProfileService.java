@@ -8,13 +8,17 @@ import pt.isep.careplatform.dto.CareRecipientRequest;
 import pt.isep.careplatform.dto.CareRecipientResponse;
 import pt.isep.careplatform.dto.CaregiverProfileRequest;
 import pt.isep.careplatform.dto.CaregiverProfileResponse;
+import pt.isep.careplatform.dto.EmergencyContactRequest;
+import pt.isep.careplatform.dto.EmergencyContactResponse;
 import pt.isep.careplatform.entity.AccessibilityTag;
 import pt.isep.careplatform.entity.CareRecipient;
 import pt.isep.careplatform.entity.Caregiver;
+import pt.isep.careplatform.entity.EmergencyContact;
 import pt.isep.careplatform.entity.User;
 import pt.isep.careplatform.entity.UserRole;
 import pt.isep.careplatform.repository.CareRecipientRepository;
 import pt.isep.careplatform.repository.CaregiverRepository;
+import pt.isep.careplatform.repository.EmergencyContactRepository;
 import pt.isep.careplatform.repository.UserRepository;
 
 import java.util.Arrays;
@@ -28,15 +32,18 @@ public class CareProfileService {
 
     private final CaregiverRepository caregiverRepository;
     private final CareRecipientRepository recipientRepository;
+    private final EmergencyContactRepository emergencyContactRepository;
     private final UserRepository userRepository;
 
     public CareProfileService(
             CaregiverRepository caregiverRepository,
             CareRecipientRepository recipientRepository,
+            EmergencyContactRepository emergencyContactRepository,
             UserRepository userRepository
     ) {
         this.caregiverRepository = caregiverRepository;
         this.recipientRepository = recipientRepository;
+        this.emergencyContactRepository = emergencyContactRepository;
         this.userRepository = userRepository;
     }
 
@@ -102,6 +109,37 @@ public class CareProfileService {
         recipientRepository.delete(ownedRecipient(caregiver, recipientId));
     }
 
+    @Transactional
+    public EmergencyContactResponse addEmergencyContact(String email, UUID caregiverId, EmergencyContactRequest request) {
+        Caregiver caregiver = ownedCaregiver(email, caregiverId);
+        EmergencyContact contact = emergencyContactRepository.save(new EmergencyContact(
+                caregiver,
+                request.displayName().trim(),
+                request.phoneNumber().trim(),
+                trimOrNull(request.relationship())
+        ));
+        return EmergencyContactResponse.from(contact);
+    }
+
+    @Transactional
+    public EmergencyContactResponse updateEmergencyContact(
+            String email,
+            UUID caregiverId,
+            UUID contactId,
+            EmergencyContactRequest request
+    ) {
+        Caregiver caregiver = ownedCaregiver(email, caregiverId);
+        EmergencyContact contact = ownedEmergencyContact(caregiver, contactId);
+        contact.update(request.displayName().trim(), request.phoneNumber().trim(), trimOrNull(request.relationship()));
+        return EmergencyContactResponse.from(contact);
+    }
+
+    @Transactional
+    public void removeEmergencyContact(String email, UUID caregiverId, UUID contactId) {
+        Caregiver caregiver = ownedCaregiver(email, caregiverId);
+        emergencyContactRepository.delete(ownedEmergencyContact(caregiver, contactId));
+    }
+
     private Caregiver ownedCaregiver(String email, UUID caregiverId) {
         Caregiver caregiver = caregiverRepository.findById(caregiverId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Perfil do cuidador não encontrado"));
@@ -129,12 +167,32 @@ public class CareProfileService {
         return recipient;
     }
 
+    private EmergencyContact ownedEmergencyContact(Caregiver caregiver, UUID contactId) {
+        EmergencyContact contact = emergencyContactRepository.findById(contactId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contacto de emergência não encontrado"));
+        if (!contact.getCaregiver().getId().equals(caregiver.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não pode aceder a este contacto de emergência");
+        }
+        return contact;
+    }
+
+    private String trimOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
     private CaregiverProfileResponse profileResponse(Caregiver caregiver) {
         List<CareRecipientResponse> recipients = recipientRepository
                 .findByCaregiver_IdOrderById(caregiver.getId()).stream()
                 .map(CareRecipientResponse::from)
                 .toList();
-        return CaregiverProfileResponse.from(caregiver, recipients);
+        List<EmergencyContactResponse> emergencyContacts = emergencyContactRepository
+                .findByCaregiver_IdOrderById(caregiver.getId()).stream()
+                .map(EmergencyContactResponse::from)
+                .toList();
+        return CaregiverProfileResponse.from(caregiver, recipients, emergencyContacts);
     }
 
     private Set<AccessibilityTag> parseTags(Set<String> values) {

@@ -11,10 +11,16 @@ public record CaregiverProfileResponse(
         String displayName,
         String phoneNumber,
         String coarseLocation,
-        List<CareRecipientResponse> recipients
+        List<CareRecipientResponse> recipients,
+        List<EmergencyContactResponse> emergencyContacts
 ) {
-    public static CaregiverProfileResponse from(Caregiver caregiver, List<CareRecipientResponse> recipients) {
+    public static CaregiverProfileResponse from(
+            Caregiver caregiver,
+            List<CareRecipientResponse> recipients,
+            List<EmergencyContactResponse> emergencyContacts
+    ) {
         return new CaregiverProfileResponse(caregiver.getId(), caregiver.getUser().getId(),
-                caregiver.getDisplayName(), caregiver.getPhoneNumber(), caregiver.getCoarseLocation(), recipients);
+                caregiver.getDisplayName(), caregiver.getPhoneNumber(), caregiver.getCoarseLocation(),
+                recipients, emergencyContacts);
     }
 }

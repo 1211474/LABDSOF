@@ -17,6 +17,8 @@ import pt.isep.careplatform.dto.CareRecipientRequest;
 import pt.isep.careplatform.dto.CareRecipientResponse;
 import pt.isep.careplatform.dto.CaregiverProfileRequest;
 import pt.isep.careplatform.dto.CaregiverProfileResponse;
+import pt.isep.careplatform.dto.EmergencyContactRequest;
+import pt.isep.careplatform.dto.EmergencyContactResponse;
 import pt.isep.careplatform.service.CareProfileService;
 
 import java.util.UUID;
@@ -83,5 +85,35 @@ public class CareProfileController {
             @PathVariable UUID recipientId
     ) {
         service.removeRecipient(authentication.getName(), caregiverId, recipientId);
+    }
+
+    @PostMapping("/{caregiverId}/emergency-contacts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EmergencyContactResponse addEmergencyContact(
+            Authentication authentication,
+            @PathVariable UUID caregiverId,
+            @Valid @RequestBody EmergencyContactRequest request
+    ) {
+        return service.addEmergencyContact(authentication.getName(), caregiverId, request);
+    }
+
+    @PatchMapping("/{caregiverId}/emergency-contacts/{contactId}")
+    public EmergencyContactResponse updateEmergencyContact(
+            Authentication authentication,
+            @PathVariable UUID caregiverId,
+            @PathVariable UUID contactId,
+            @Valid @RequestBody EmergencyContactRequest request
+    ) {
+        return service.updateEmergencyContact(authentication.getName(), caregiverId, contactId, request);
+    }
+
+    @DeleteMapping("/{caregiverId}/emergency-contacts/{contactId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeEmergencyContact(
+            Authentication authentication,
+            @PathVariable UUID caregiverId,
+            @PathVariable UUID contactId
+    ) {
+        service.removeEmergencyContact(authentication.getName(), caregiverId, contactId);
     }
 }
