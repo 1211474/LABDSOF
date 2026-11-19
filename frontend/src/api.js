@@ -15,6 +15,12 @@ export async function fetchServices({ type, coarseLocation } = {}) {
   return response.json()
 }
 
+export async function fetchServiceDetails(serviceId) {
+  const response = await fetch(apiUrl(`/api/v1/services/${serviceId}`))
+  if (!response.ok) throw new Error('Não foi possível carregar os detalhes do serviço.')
+  return response.json()
+}
+
 export async function login(email, password) {
   const response = await fetch(apiUrl('/api/v1/auth/login'), {
     method: 'POST',
