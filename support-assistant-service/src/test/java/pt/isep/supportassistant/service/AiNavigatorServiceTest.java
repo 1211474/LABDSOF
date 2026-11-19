@@ -8,9 +8,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.ResourceAccessException;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
 import pt.isep.supportassistant.dto.CareServiceDto;
+import pt.isep.supportassistant.dto.GroundedService;
 import pt.isep.supportassistant.integration.CarePlatformClient;
 
+import java.lang.reflect.RecordComponent;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,7 +34,8 @@ class AiNavigatorServiceTest {
 
     @BeforeEach
     void setUp() {
-        aiNavigatorService = new AiNavigatorService(carePlatformClient, new AssistantQueryParser());
+        aiNavigatorService = new AiNavigatorService(
+                new VerifiedServiceGrounding(carePlatformClient), new AssistantQueryParser());
     }
 
     @Test
@@ -46,7 +50,7 @@ class AiNavigatorServiceTest {
         AiNavigateResponse response = aiNavigatorService.navigate("farmácias abertas perto da Boavista");
 
         verify(carePlatformClient).fetchServices("PHARMACY", null);
-        assertThat(response.services()).containsExactly(openPharmacy);
+        assertThat(response.services()).containsExactly(grounded(openPharmacy));
         assertThat(response.answer())
                 .contains("Encontrei 1 resultado")
                 .contains("farmácias")
@@ -68,7 +72,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("pharmacies open near Boavista");
 
-        assertThat(response.services()).containsExactly(openPharmacy);
+        assertThat(response.services()).containsExactly(grounded(openPharmacy));
         assertThat(response.answer()).contains("perto de Boavista", "com estado aberto");
     }
 
@@ -83,7 +87,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("farmácias fechadas");
 
-        assertThat(response.services()).containsExactly(temporarilyClosed, closedPharmacy);
+        assertThat(response.services()).containsExactly(grounded(temporarilyClosed), grounded(closedPharmacy));
         assertThat(response.answer())
                 .contains("com estado fechado")
                 .contains("temporariamente fechado")
@@ -153,7 +157,8 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
 
-        assertThat(response.services()).containsExactly(open, temporarilyClosed, closed, unknown);
+        assertThat(response.services()).containsExactly(
+                grounded(open), grounded(temporarilyClosed), grounded(closed), grounded(unknown));
     }
 
     @Test
@@ -178,7 +183,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("preciso de ajuda");
 
-        assertThat(response.services()).containsExactly(pharmacy, dayCentre);
+        assertThat(response.services()).containsExactly(grounded(pharmacy), grounded(dayCentre));
         assertThat(response.answer())
                 .contains("Encontrei 2 resultados")
                 .doesNotContain("para ")
@@ -194,7 +199,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("centros de dia em campanha");
 
-        assertThat(response.services()).containsExactly(dayCentre);
+        assertThat(response.services()).containsExactly(grounded(dayCentre));
         assertThat(response.answer()).contains("perto de Campanhã");
     }
 
@@ -207,7 +212,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("farmácias near Fânzeres");
 
-        assertThat(response.services()).containsExactly(pharmacy);
+        assertThat(response.services()).containsExactly(grounded(pharmacy));
         assertThat(response.answer()).contains("perto de Fânzeres");
     }
 
@@ -222,7 +227,7 @@ class AiNavigatorServiceTest {
 
         AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
 
-        assertThat(response.services()).containsExactly(verifiedPharmacy);
+        assertThat(response.services()).containsExactly(grounded(verifiedPharmacy));
         assertThat(response.answer()).contains("Encontrei 1 resultado");
     }
 
@@ -243,12 +248,103 @@ class AiNavigatorServiceTest {
     }
 
     @Test
+    void includesSourceContextWithEveryAnswer() {
+        CareServiceDto pharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull()))
+                .thenReturn(List.of(pharmacy));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.sourceContext()).isNotNull();
+        assertThat(response.sourceContext().source()).contains("verificado");
+        assertThat(response.sourceContext().retrievedAt()).isNotNull();
+        assertThat(response.sourceContext().recordCount()).isEqualTo(1);
+        assertThat(response.answer()).contains("Fonte:", response.sourceContext().source());
+        assertThat(response.services())
+                .allSatisfy(result -> assertThat(result.source()).isEqualTo(response.sourceContext().source()));
+    }
+
+    @Test
+    void includesSourceContextWhenNoServiceMatches() {
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull()))
+                .thenReturn(List.of());
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.services()).isEmpty();
+        assertThat(response.sourceContext()).isNotNull();
+        assertThat(response.answer()).contains("Fonte:");
+    }
+
+    @Test
+    void sendsOnlyAllowlistedFieldsToTheCaller() {
+        CareServiceDto pharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull()))
+                .thenReturn(List.of(pharmacy));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.sourceContext().allowedFields())
+                .containsExactlyElementsOf(GroundedService.ALLOWED_FIELDS)
+                .doesNotContain("organisationId");
+        assertThat(Arrays.stream(GroundedService.class.getRecordComponents())
+                .map(RecordComponent::getName))
+                .containsExactlyElementsOf(GroundedService.ALLOWED_FIELDS);
+    }
+
+    @Test
+    void doesNotReturnUnsupportedServiceTypes() {
+        CareServiceDto supported = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+        CareServiceDto unsupported = service("Serviço Desconhecido", "MYSTERY_SERVICE", "Boavista", "OPEN");
+
+        when(carePlatformClient.fetchServices(isNull(), isNull()))
+                .thenReturn(List.of(supported, unsupported));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("preciso de ajuda");
+
+        assertThat(response.services()).containsExactly(grounded(supported));
+        assertThat(response.answer()).doesNotContain("Serviço Desconhecido", "MYSTERY_SERVICE");
+        assertThat(response.sourceContext().recordCount()).isEqualTo(1);
+    }
+
+    @Test
+    void doesNotClaimAvailabilityForUnknownStatus() {
+        CareServiceDto unknown = service("Farmácia Sem Estado", "PHARMACY", "Boavista", "UNKNOWN");
+
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull()))
+                .thenReturn(List.of(unknown));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.answer())
+                .contains("estado: desconhecido")
+                .doesNotContain("estado: aberto", "disponível agora");
+    }
+
+    @Test
     void throwsControlledExceptionWhenCarePlatformIsUnavailable() {
         when(carePlatformClient.fetchServices(isNull(), isNull()))
                 .thenThrow(new ResourceAccessException("connection refused"));
 
         assertThatThrownBy(() -> aiNavigatorService.navigate("ajuda"))
                 .isInstanceOf(AssistantUnavailableException.class);
+    }
+
+    private static GroundedService grounded(CareServiceDto service) {
+        return new GroundedService(
+                service.id(),
+                service.name(),
+                service.type(),
+                service.coarseLocation(),
+                service.operatingHours(),
+                service.currentStatus(),
+                service.contactPhone(),
+                service.verified(),
+                service.lastUpdated(),
+                VerifiedServiceGrounding.SOURCE
+        );
     }
 
     private static CareServiceDto service(String name, String type, String location, String status) {

@@ -4,8 +4,9 @@ import java.util.List;
 
 public record AiNavigateResponse(
         String answer,
-        List<CareServiceDto> services,
+        List<GroundedService> services,
         boolean isFallback,
-        List<String> limitations
+        List<String> limitations,
+        SourceContext sourceContext
 ) {
 }

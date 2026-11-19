@@ -95,6 +95,40 @@ endpoint is safe to run without AI credentials. The frontend contract is ready t
 bounded AI provider later. If the Care Platform API is unavailable, the endpoint returns `503`
 with a `fallbackUrl` pointing to the standard service search.
 
+## Answer grounding in verified data (US07)
+
+Before any answer text is produced, the navigator runs a grounding step over the application
+records:
+
+1. `VerifiedServiceGrounding` reads matching records from the Care Platform API and keeps only
+   records from verified organisations with a recognised service type. Unsupported service types
+   and unverified organisations are dropped.
+2. Each remaining record is projected onto `GroundedService`, an explicit allowlist of fields:
+   `id`, `name`, `type`, `coarseLocation`, `operatingHours`, `currentStatus`, `contactPhone`,
+   `verified`, `lastUpdated` and `source`. Internal fields such as `organisationId` never leave
+   the grounding layer.
+3. The readable answer and the returned `services` are built only from those projected records.
+   Unknown statuses are labelled `desconhecido`; no availability is claimed beyond the stored
+   `currentStatus`, and the answer always asks the caregiver to confirm by phone.
+
+Every response includes `sourceContext` with the provenance, retrieval time, allowlisted fields
+and number of grounded records:
+
+```json
+{
+  "sourceContext": {
+    "source": "Diretório de serviços verificado da plataforma",
+    "retrievedAt": "2026-11-17T10:00:00Z",
+    "allowedFields": ["id", "name", "type", "coarseLocation", "operatingHours", "currentStatus", "contactPhone", "verified", "lastUpdated", "source"],
+    "recordCount": 1
+  }
+}
+```
+
+The UI shows this source line and each result's last-update date. This release still uses
+deterministic keyword interpretation, so no external LLM prompt is sent; the same allowlist is the
+boundary that would constrain any model provider added later.
+
 ## Run the tests
 
 Backend:

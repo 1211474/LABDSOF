@@ -1,10 +1,9 @@
 package pt.isep.supportassistant.service;
 
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
-import pt.isep.supportassistant.dto.CareServiceDto;
-import pt.isep.supportassistant.integration.CarePlatformClient;
+import pt.isep.supportassistant.dto.GroundedService;
+import pt.isep.supportassistant.service.VerifiedServiceGrounding.GroundingResult;
 
 import java.util.Comparator;
 import java.util.List;
@@ -17,7 +16,7 @@ public class AiNavigatorService {
     private static final int MAX_DETAILED_RESULTS = 3;
 
     private static final List<String> LIMITATIONS = List.of(
-            "Resposta construída por interpretação de palavras-chave sobre o diretório de serviços da plataforma.",
+            "Resposta construída apenas a partir de registos verificados do diretório de serviços da plataforma.",
             "A disponibilidade em tempo real não é garantida. Confirme sempre diretamente com a instituição.",
             "O assistente não substitui aconselhamento médico, diagnóstico, prescrição ou serviços de emergência (112 / SNS 24)."
     );
@@ -31,46 +30,42 @@ public class AiNavigatorService {
             "OTHER", "serviços"
     );
 
-    private final CarePlatformClient carePlatformClient;
+    private final VerifiedServiceGrounding grounding;
     private final AssistantQueryParser queryParser;
 
-    public AiNavigatorService(CarePlatformClient carePlatformClient, AssistantQueryParser queryParser) {
-        this.carePlatformClient = carePlatformClient;
+    public AiNavigatorService(VerifiedServiceGrounding grounding, AssistantQueryParser queryParser) {
+        this.grounding = grounding;
         this.queryParser = queryParser;
     }
 
     public AiNavigateResponse navigate(String query) {
         AssistantQuery assistantQuery = queryParser.parse(query);
 
-        List<CareServiceDto> availableServices;
-        try {
-            availableServices = carePlatformClient.fetchServices(assistantQuery.type(), null);
-        } catch (RestClientException exception) {
-            throw new AssistantUnavailableException("Care Platform API is unavailable", exception);
-        }
+        GroundingResult groundingResult = grounding.retrieve(assistantQuery.type());
+        List<GroundedService> groundedServices = groundingResult.records();
 
-        List<CareServiceDto> results = filterAndRank(availableServices, assistantQuery);
-        String location = resolveLocationName(assistantQuery.location(), availableServices);
+        List<GroundedService> results = filterAndRank(groundedServices, assistantQuery);
+        String location = resolveLocationName(assistantQuery.location(), groundedServices);
         String answer = buildAnswer(assistantQuery, location, results);
 
-        return new AiNavigateResponse(answer, results, true, LIMITATIONS);
+        return new AiNavigateResponse(answer, results, true, LIMITATIONS, groundingResult.sourceContext());
     }
 
-    private List<CareServiceDto> filterAndRank(List<CareServiceDto> services, AssistantQuery assistantQuery) {
+    private List<GroundedService> filterAndRank(List<GroundedService> services, AssistantQuery assistantQuery) {
         String requestedLocation = QueryText.normalize(assistantQuery.location());
 
         return services.stream()
-                .filter(CareServiceDto::verified)
+                .filter(GroundedService::verified)
                 .filter(service -> requestedLocation.isEmpty()
                         || requestedLocation.equals(QueryText.normalize(service.coarseLocation())))
                 .filter(service -> matchesStatus(service, assistantQuery.status()))
                 .sorted(Comparator
-                        .comparingInt((CareServiceDto service) -> statusRank(service.currentStatus()))
-                        .thenComparing(CareServiceDto::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                        .comparingInt((GroundedService service) -> statusRank(service.currentStatus()))
+                        .thenComparing(GroundedService::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
 
-    private boolean matchesStatus(CareServiceDto service, AssistantQuery.StatusPreference status) {
+    private boolean matchesStatus(GroundedService service, AssistantQuery.StatusPreference status) {
         return switch (status) {
             case OPEN_ONLY -> "OPEN".equals(service.currentStatus());
             case CLOSED_ONLY -> "CLOSED".equals(service.currentStatus())
@@ -92,21 +87,21 @@ public class AiNavigatorService {
         };
     }
 
-    private String resolveLocationName(String requestedLocation, List<CareServiceDto> services) {
+    private String resolveLocationName(String requestedLocation, List<GroundedService> services) {
         if (requestedLocation == null || requestedLocation.isBlank()) {
             return null;
         }
 
         String normalizedLocation = QueryText.normalize(requestedLocation);
         return services.stream()
-                .map(CareServiceDto::coarseLocation)
+                .map(GroundedService::coarseLocation)
                 .filter(Objects::nonNull)
                 .filter(location -> QueryText.normalize(location).equals(normalizedLocation))
                 .findFirst()
                 .orElse(requestedLocation);
     }
 
-    private String buildAnswer(AssistantQuery assistantQuery, String location, List<CareServiceDto> results) {
+    private String buildAnswer(AssistantQuery assistantQuery, String location, List<GroundedService> results) {
         String subject = assistantQuery.type() == null ? null : TYPE_PLURALS.get(assistantQuery.type());
         StringBuilder answer = new StringBuilder();
 
@@ -117,6 +112,7 @@ public class AiNavigatorService {
             appendLocation(answer, location);
             answer.append(" no diretório da plataforma. ")
                     .append("Tente outra zona ou tipo de serviço, ou contacte diretamente os serviços locais.");
+            appendSource(answer);
             return answer.toString();
         }
 
@@ -139,11 +135,12 @@ public class AiNavigatorService {
         }
 
         answer.append(" Confirme sempre a disponibilidade por telefone antes de se deslocar.");
+        appendSource(answer);
 
         return answer.toString();
     }
 
-    private void appendDetailedResults(StringBuilder answer, List<CareServiceDto> results) {
+    private void appendDetailedResults(StringBuilder answer, List<GroundedService> results) {
         answer.append(' ');
 
         for (int index = 0; index < results.size(); index++) {
@@ -151,7 +148,7 @@ public class AiNavigatorService {
                 answer.append("; ");
             }
 
-            CareServiceDto service = results.get(index);
+            GroundedService service = results.get(index);
             answer.append(service.name())
                     .append(" (").append(service.coarseLocation())
                     .append("; estado: ").append(statusLabel(service.currentStatus()))
@@ -167,6 +164,10 @@ public class AiNavigatorService {
         if (location != null && !location.isBlank()) {
             answer.append(" perto de ").append(location);
         }
+    }
+
+    private void appendSource(StringBuilder answer) {
+        answer.append(" Fonte: ").append(VerifiedServiceGrounding.SOURCE).append('.');
     }
 
     private String statusClause(AssistantQuery.StatusPreference status) {

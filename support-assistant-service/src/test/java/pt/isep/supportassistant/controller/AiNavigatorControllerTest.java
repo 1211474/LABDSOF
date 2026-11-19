@@ -6,9 +6,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
+import pt.isep.supportassistant.dto.GroundedService;
+import pt.isep.supportassistant.dto.SourceContext;
 import pt.isep.supportassistant.service.AiNavigatorService;
 import pt.isep.supportassistant.service.AssistantUnavailableException;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,7 +37,13 @@ class AiNavigatorControllerTest {
                         "Foram encontrados 1 serviço(s) no diretório verificado.",
                         List.of(),
                         true,
-                        List.of("A disponibilidade não é garantida.")
+                        List.of("A disponibilidade não é garantida."),
+                        new SourceContext(
+                                "Diretório de serviços verificado da plataforma",
+                                Instant.parse("2026-11-17T10:00:00Z"),
+                                GroundedService.ALLOWED_FIELDS,
+                                1
+                        )
                 ));
 
         mockMvc.perform(post("/api/v1/ai/navigate")
@@ -43,7 +52,10 @@ class AiNavigatorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isFallback").value(true))
                 .andExpect(jsonPath("$.answer").isNotEmpty())
-                .andExpect(jsonPath("$.limitations").isArray());
+                .andExpect(jsonPath("$.limitations").isArray())
+                .andExpect(jsonPath("$.sourceContext.source").isNotEmpty())
+                .andExpect(jsonPath("$.sourceContext.recordCount").value(1))
+                .andExpect(jsonPath("$.sourceContext.allowedFields").isArray());
     }
 
     @Test

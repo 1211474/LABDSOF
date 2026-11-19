@@ -47,7 +47,13 @@ describe('App', () => {
         'Farmácia da Boavista (Boavista; estado: aberto; horário: 08:00 - 22:00; telefone: +351220000001).',
       services,
       isFallback: true,
-      limitations: ['A disponibilidade em tempo real não é garantida.']
+      limitations: ['A disponibilidade em tempo real não é garantida.'],
+      sourceContext: {
+        source: 'Diretório de serviços verificado da plataforma',
+        retrievedAt: '2026-11-17T10:00:00Z',
+        allowedFields: ['name', 'currentStatus', 'lastUpdated'],
+        recordCount: 1
+      }
     }
 
     global.fetch = vi.fn()
@@ -64,6 +70,9 @@ describe('App', () => {
 
     expect(await screen.findByText(/Encontrei 1 resultado para farmácias/i)).toBeInTheDocument()
     expect(screen.getByText(/a pergunta foi interpretada por palavras-chave/i)).toBeInTheDocument()
+    expect(screen.getByTestId('assistant-source-context')).toHaveTextContent(
+      /Fonte: Diretório de serviços verificado da plataforma · 1 registo\(s\) verificado\(s\)/
+    )
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/v1/ai/navigate',
       expect.objectContaining({

@@ -556,6 +556,13 @@ export default function App() {
                 Modo de contingência: a pergunta foi interpretada por palavras-chave sobre os dados do diretório.
               </p>
             ) : null}
+            {assistantResult.sourceContext ? (
+              <p className="mt-2 text-sm text-slate-700" data-testid="assistant-source-context">
+                Fonte: {assistantResult.sourceContext.source} ·{' '}
+                {assistantResult.sourceContext.recordCount} registo(s) verificado(s) · Consultado em{' '}
+                {new Date(assistantResult.sourceContext.retrievedAt).toLocaleString('pt-PT')}
+              </p>
+            ) : null}
             {assistantResult.services?.length ? (
               <ul className="mt-3 space-y-2">
                 {assistantResult.services.map((service) => (
@@ -565,6 +572,11 @@ export default function App() {
                       {TYPE_LABELS[service.type] ?? service.type} · {service.coarseLocation} ·{' '}
                       {STATUS_LABELS[service.currentStatus] ?? service.currentStatus}
                     </span>
+                    {service.lastUpdated ? (
+                      <span className="block text-sm text-slate-600">
+                        Atualizado em {new Date(service.lastUpdated).toLocaleDateString('pt-PT')}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
