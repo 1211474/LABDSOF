@@ -95,6 +95,12 @@ endpoint is safe to run without AI credentials. The frontend contract is ready t
 bounded AI provider later. If the Care Platform API is unavailable, the endpoint returns `503`
 with a `fallbackUrl` pointing to the standard service search.
 
+## Contact a service (US11)
+
+Each service result, including results from the assistant, provides a telephone link when a contact
+number is available. The link opens the device's calling application, and the notice beside it
+reminds caregivers to confirm availability directly. If no number is available, no call link is shown.
+
 ## Answer grounding in verified data (US07)
 
 Before any answer text is produced, the navigator runs a grounding step over the application

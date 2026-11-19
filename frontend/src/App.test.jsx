@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App.jsx'
 
 const services = [
@@ -38,6 +38,20 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
       .toHaveAttribute('href', 'tel:+351220000001')
     expect(screen.getByText('Fonte oficial verificada')).toBeInTheDocument()
+    const result = screen.getByRole('heading', { name: 'Farmácia da Boavista' }).closest('article')
+    expect(within(result).getByText(/disponibilidade em tempo real não é garantida.*confirme.*telefone/i))
+      .toBeInTheDocument()
+  })
+
+  it('does not offer a call link when a service has no phone number', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ ...services[0], contactPhone: '  ' }]
+    })
+
+    render(<App />)
+    expect(await screen.findByText('Contacto telefónico indisponível.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /ligar para farmácia da boavista/i })).not.toBeInTheDocument()
   })
 
   it('sends a plain-language question and renders the navigator answer', async () => {
@@ -73,6 +87,11 @@ describe('App', () => {
     expect(screen.getByTestId('assistant-source-context')).toHaveTextContent(
       /Fonte: Diretório de serviços verificado da plataforma · 1 registo\(s\) verificado\(s\)/
     )
+    const assistantResult = screen.getByText('Farmácia da Boavista', { selector: 'span' }).closest('li')
+    expect(within(assistantResult).getByRole('link', { name: /ligar para farmácia da boavista/i }))
+      .toHaveAttribute('href', 'tel:+351220000001')
+    expect(within(assistantResult).getByText(/disponibilidade em tempo real não é garantida.*confirme.*telefone/i))
+      .toBeInTheDocument()
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/v1/ai/navigate',
       expect.objectContaining({
