@@ -18,6 +18,7 @@ import pt.isep.careplatform.repository.OrganisationRepository;
 import pt.isep.careplatform.repository.SupportServiceRepository;
 import pt.isep.careplatform.repository.CareRecipientRepository;
 import pt.isep.careplatform.repository.CaregiverRepository;
+import pt.isep.careplatform.repository.EmergencyContactRepository;
 import pt.isep.careplatform.repository.UserRepository;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -52,10 +53,14 @@ class ServiceApiIntegrationTest {
     private CareRecipientRepository careRecipientRepository;
 
     @Autowired
+    private EmergencyContactRepository emergencyContactRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        emergencyContactRepository.deleteAll();
         careRecipientRepository.deleteAll();
         caregiverRepository.deleteAll();
         userRepository.deleteAll();
@@ -63,6 +68,7 @@ class ServiceApiIntegrationTest {
         organisationRepository.deleteAll();
 
         userRepository.save(new User("ana@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
+        userRepository.save(new User("bruno@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
         Organisation pharmacy = organisationRepository.save(new Organisation("Test Pharmacy", true));
         Organisation dayCentre = organisationRepository.save(new Organisation("Test Day Centre", true));
 
@@ -249,12 +255,175 @@ class ServiceApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void createsReadsUpdatesAndRemovesEmergencyContact() throws Exception {
+        String token = caregiverToken();
+        String caregiverId = mockMvc.perform(post("/api/v1/caregivers")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Ana Lopes",
+                                  "phoneNumber": "+351 912 345 678",
+                                  "coarseLocation": "Boavista"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        String contactId = mockMvc.perform(post("/api/v1/caregivers/" + caregiverId + "/emergency-contacts")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Rita Lopes",
+                                  "phoneNumber": "+351 913 000 111",
+                                  "relationship": "Filha"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.displayName").value("Rita Lopes"))
+                .andExpect(jsonPath("$.phoneNumber").value("+351 913 000 111"))
+                .andExpect(jsonPath("$.relationship").value("Filha"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        mockMvc.perform(patch("/api/v1/caregivers/" + caregiverId + "/emergency-contacts/" + contactId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Rita Silva",
+                                  "phoneNumber": "+351 913 000 222",
+                                  "relationship": "Vizinha"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Rita Silva"))
+                .andExpect(jsonPath("$.relationship").value("Vizinha"));
+
+        mockMvc.perform(get("/api/v1/caregivers/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emergencyContacts[0].displayName").value("Rita Silva"));
+
+        mockMvc.perform(delete("/api/v1/caregivers/" + caregiverId + "/emergency-contacts/" + contactId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/caregivers/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emergencyContacts.length()").value(0));
+    }
+
+    @Test
+    void rejectsUnauthenticatedEmergencyContactMutations() throws Exception {
+        String token = caregiverToken();
+        String caregiverId = mockMvc.perform(post("/api/v1/caregivers")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Ana Lopes",
+                                  "phoneNumber": "+351 912 345 678",
+                                  "coarseLocation": "Boavista"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        mockMvc.perform(post("/api/v1/caregivers/" + caregiverId + "/emergency-contacts")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Rita Lopes",
+                                  "phoneNumber": "+351 913 000 111"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void preventsOtherCaregiversFromAccessingOrMutatingEmergencyContacts() throws Exception {
+        String anaToken = caregiverToken();
+        String anaCaregiverId = mockMvc.perform(post("/api/v1/caregivers")
+                        .header("Authorization", "Bearer " + anaToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Ana Lopes",
+                                  "phoneNumber": "+351 912 345 678",
+                                  "coarseLocation": "Boavista"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        String contactId = mockMvc.perform(post("/api/v1/caregivers/" + anaCaregiverId + "/emergency-contacts")
+                        .header("Authorization", "Bearer " + anaToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Rita Lopes",
+                                  "phoneNumber": "+351 913 000 111"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        String brunoToken = tokenFor("bruno@example.com");
+        mockMvc.perform(post("/api/v1/caregivers/" + anaCaregiverId + "/emergency-contacts")
+                        .header("Authorization", "Bearer " + brunoToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Carlos",
+                                  "phoneNumber": "+351 913 000 999"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/v1/caregivers/" + anaCaregiverId + "/emergency-contacts/" + contactId)
+                        .header("Authorization", "Bearer " + brunoToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Carlos",
+                                  "phoneNumber": "+351 913 000 999"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/caregivers/" + anaCaregiverId + "/emergency-contacts/" + contactId)
+                        .header("Authorization", "Bearer " + brunoToken))
+                .andExpect(status().isForbidden());
+    }
+
     private String caregiverToken() throws Exception {
+        return tokenFor("ana@example.com");
+    }
+
+    private String tokenFor(String email) throws Exception {
         return mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"email":"ana@example.com","password":"password"}
-                                """))
+                                {"email":"%s","password":"password"}
+                                """.formatted(email)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

@@ -90,6 +90,31 @@ export async function removeCareRecipient(caregiverId, recipientId) {
   }
 }
 
+export function addEmergencyContact(caregiverId, contact) {
+  return profileRequest(`/api/v1/caregivers/${caregiverId}/emergency-contacts`, {
+    method: 'POST',
+    body: JSON.stringify(contact)
+  })
+}
+
+export function updateEmergencyContact(caregiverId, contactId, contact) {
+  return profileRequest(`/api/v1/caregivers/${caregiverId}/emergency-contacts/${contactId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(contact)
+  })
+}
+
+export async function removeEmergencyContact(caregiverId, contactId) {
+  const response = await fetch(`/api/v1/caregivers/${caregiverId}/emergency-contacts/${contactId}`, {
+    method: 'DELETE',
+    headers: authenticatedHeaders()
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(body.detail || 'Não foi possível remover o contacto de emergência.')
+  }
+}
+
 export async function askNavigator(query) {
   const response = await fetch('/api/v1/ai/navigate', {
     method: 'POST',
