@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import App from './App.jsx'
 
 const services = [
@@ -27,6 +27,7 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -80,5 +81,59 @@ describe('App', () => {
         body: JSON.stringify({ query: 'farmácias abertas perto da Boavista' })
       })
     )
+  })
+
+  it('offers the standard search when the assistant is unavailable without retaining an old answer', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => services })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'Resposta anterior', services: [] })
+      })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: true, json: async () => services })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+    fireEvent.change(screen.getByLabelText(/qual é a sua necessidade/i), {
+      target: { value: 'farmácias' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /procurar ajuda/i }))
+    expect(await screen.findByText('Resposta anterior')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /procurar ajuda/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/assistente.*indisponível/i)
+    expect(screen.queryByText('Resposta anterior')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /usar a pesquisa normal/i }))
+      .toHaveAttribute('href', '#search-title')
+
+    fireEvent.change(screen.getByLabelText('Zona'), { target: { value: 'Boavista' } })
+    fireEvent.click(screen.getByRole('button', { name: /^pesquisar$/i }))
+    expect(await screen.findByText('Farmácia da Boavista')).toBeInTheDocument()
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/v1/services?coarseLocation=Boavista')
+  })
+
+  it('shows the standard search fallback when the assistant times out', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => services })
+      .mockImplementationOnce((_url, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      }))
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+    vi.useFakeTimers()
+    fireEvent.change(screen.getByLabelText(/qual é a sua necessidade/i), {
+      target: { value: 'farmácias' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /procurar ajuda/i }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8000)
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/demorou demasiado tempo/i)
+    expect(screen.getByRole('link', { name: /usar a pesquisa normal/i }))
+      .toHaveAttribute('href', '#search-title')
+    expect(screen.getByRole('button', { name: /procurar ajuda/i })).toBeEnabled()
   })
 })
