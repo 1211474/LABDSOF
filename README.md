@@ -93,7 +93,9 @@ unverified organisations are excluded. For example:
 This release uses deterministic keyword interpretation rather than an external LLM, so the
 endpoint is safe to run without AI credentials. The frontend contract is ready to be backed by the
 bounded AI provider later. If the Care Platform API is unavailable, the endpoint returns `503`
-with a `fallbackUrl` pointing to the standard service search.
+with a `fallbackUrl` pointing to the standard service search. If the assistant is unavailable,
+returns an invalid response, or takes longer than eight seconds, the frontend shows an error and
+links to the standard search; it does not display a previous answer as a new result.
 
 ## Contact a service (US11)
 

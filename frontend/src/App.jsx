@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   addCareRecipient,
+  addEmergencyContact,
   askNavigator,
   createCaregiverProfile,
   fetchCaregiverProfile,
@@ -8,8 +9,10 @@ import {
   fetchServices,
   login,
   removeCareRecipient,
+  removeEmergencyContact,
   updateCareRecipient,
-  updateCaregiverProfile
+  updateCaregiverProfile,
+  updateEmergencyContact
 } from './api'
 
 const SERVICE_TYPES = [
@@ -107,6 +110,12 @@ export default function App() {
   const [editingRecipientId, setEditingRecipientId] = useState(null)
   const [recipientError, setRecipientError] = useState('')
   const [recipientSuccess, setRecipientSuccess] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactRelationship, setContactRelationship] = useState('')
+  const [editingContactId, setEditingContactId] = useState(null)
+  const [contactError, setContactError] = useState('')
+  const [contactSuccess, setContactSuccess] = useState('')
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -286,6 +295,66 @@ export default function App() {
       setRecipientSuccess('Pessoa acompanhada removida.')
     } catch (requestError) {
       setRecipientError(requestError.message)
+    }
+  }
+
+  function startEditingContact(contact) {
+    setEditingContactId(contact.id)
+    setContactName(contact.displayName)
+    setContactPhone(contact.phoneNumber)
+    setContactRelationship(contact.relationship ?? '')
+    setContactError('')
+    setContactSuccess('')
+  }
+
+  function resetContactForm() {
+    setEditingContactId(null)
+    setContactName('')
+    setContactPhone('')
+    setContactRelationship('')
+  }
+
+  async function handleContactSubmit(event) {
+    event.preventDefault()
+    setContactError('')
+    setContactSuccess('')
+
+    try {
+      const request = {
+        displayName: contactName.trim(),
+        phoneNumber: contactPhone.trim(),
+        relationship: contactRelationship.trim()
+      }
+      const contact = editingContactId
+        ? await updateEmergencyContact(careProfile.id, editingContactId, request)
+        : await addEmergencyContact(careProfile.id, request)
+      setCareProfile((current) => ({
+        ...current,
+        emergencyContacts: editingContactId
+          ? current.emergencyContacts.map((item) => item.id === contact.id ? contact : item)
+          : [...(current.emergencyContacts ?? []), contact]
+      }))
+      resetContactForm()
+      setContactSuccess(editingContactId ? 'Contacto de emergência atualizado.' : 'Contacto de emergência adicionado.')
+    } catch (requestError) {
+      setContactError(requestError.message)
+    }
+  }
+
+  async function handleRemoveContact(contactId) {
+    if (!window.confirm('Remover este contacto de emergência?')) return
+    setContactError('')
+    setContactSuccess('')
+    try {
+      await removeEmergencyContact(careProfile.id, contactId)
+      setCareProfile((current) => ({
+        ...current,
+        emergencyContacts: current.emergencyContacts.filter((item) => item.id !== contactId)
+      }))
+      if (editingContactId === contactId) resetContactForm()
+      setContactSuccess('Contacto de emergência removido.')
+    } catch (requestError) {
+      setContactError(requestError.message)
     }
   }
 
@@ -523,6 +592,110 @@ export default function App() {
               </ul>
             </div>
           ) : null}
+
+          {careProfile ? (
+            <form className="mt-6 border-t-2 border-emerald-200 pt-5" onSubmit={handleContactSubmit}>
+              <h3 className="text-xl font-bold">
+                {editingContactId ? 'Editar contacto de emergência' : 'Adicionar contacto de emergência'}
+              </h3>
+              <p className="mt-2 text-slate-800">
+                Guarde quem deve ser contactado rapidamente se a sua rotina de apoio falhar.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label>
+                  <span className="block font-semibold">Nome</span>
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                    value={contactName}
+                    onChange={(event) => setContactName(event.target.value)}
+                    maxLength={120}
+                    required
+                  />
+                </label>
+                <label>
+                  <span className="block font-semibold">Telefone</span>
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                    value={contactPhone}
+                    onChange={(event) => setContactPhone(event.target.value)}
+                    placeholder="+351 912 345 678"
+                    type="tel"
+                    required
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="block font-semibold">Relação (opcional)</span>
+                  <input
+                    className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-4 py-3 text-lg"
+                    value={contactRelationship}
+                    onChange={(event) => setContactRelationship(event.target.value)}
+                    placeholder="Ex.: Filha, vizinho"
+                    maxLength={60}
+                  />
+                </label>
+              </div>
+              <button
+                className="mt-4 min-h-12 rounded-xl bg-sky-800 px-6 py-3 text-lg font-bold text-white hover:bg-sky-900"
+                type="submit"
+              >
+                {editingContactId ? 'Guardar alterações' : 'Adicionar contacto'}
+              </button>
+              {editingContactId ? (
+                <button
+                  className="ml-3 min-h-12 rounded-xl border-2 border-slate-600 px-6 py-3 text-lg font-bold hover:bg-white"
+                  type="button"
+                  onClick={resetContactForm}
+                >
+                  Cancelar
+                </button>
+              ) : null}
+              {contactError ? <p className="mt-3 font-semibold text-red-950" role="alert">{contactError}</p> : null}
+              {contactSuccess ? <p className="mt-3 font-semibold text-emerald-950" role="status">{contactSuccess}</p> : null}
+            </form>
+          ) : null}
+
+          {careProfile?.emergencyContacts?.length ? (
+            <div className="mt-5">
+              <h3 className="font-bold">Contactos de emergência</h3>
+              <ul className="mt-2 space-y-2">
+                {careProfile.emergencyContacts.map((contact) => (
+                  <li key={contact.id} className="rounded-xl border-2 border-emerald-200 bg-white p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold">{contact.displayName}</p>
+                        <p className="text-sm text-slate-700">
+                          {contact.phoneNumber}{contact.relationship ? ` · ${contact.relationship}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          className="rounded-lg border-2 border-emerald-700 px-3 py-2 font-bold text-emerald-900"
+                          href={`tel:${contact.phoneNumber}`}
+                          aria-label={`Ligar para ${contact.displayName}`}
+                        >
+                          Ligar
+                        </a>
+                        <button
+                          className="rounded-lg border-2 border-sky-700 px-3 py-2 font-bold text-sky-900"
+                          type="button"
+                          onClick={() => startEditingContact(contact)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="rounded-lg border-2 border-red-700 px-3 py-2 font-bold text-red-900"
+                          type="button"
+                          onClick={() => void handleRemoveContact(contact.id)}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -566,9 +739,12 @@ export default function App() {
         </form>
 
         {assistantError ? (
-          <p className="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-950" role="alert">
-            {assistantError} Use a pesquisa de serviços abaixo.
-          </p>
+          <div className="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-950" role="alert">
+            <p>{assistantError}</p>
+            <a className="mt-2 inline-block underline" href="#search-title">
+              Usar a pesquisa normal de serviços
+            </a>
+          </div>
         ) : null}
 
         {assistantResult ? (
@@ -626,7 +802,7 @@ export default function App() {
       )}
 
       <section className="mb-8" aria-labelledby="search-title">
-        <h2 id="search-title" className="text-2xl font-bold">
+        <h2 id="search-title" tabIndex="-1" className="text-2xl font-bold">
           Pesquisar serviços de apoio
         </h2>
 

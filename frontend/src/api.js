@@ -90,13 +90,58 @@ export async function removeCareRecipient(caregiverId, recipientId) {
   }
 }
 
-export async function askNavigator(query) {
-  const response = await fetch('/api/v1/ai/navigate', {
+export function addEmergencyContact(caregiverId, contact) {
+  return profileRequest(`/api/v1/caregivers/${caregiverId}/emergency-contacts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query })
+    body: JSON.stringify(contact)
   })
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(body.error || 'O assistente está temporariamente indisponível.')
-  return body
+}
+
+export function updateEmergencyContact(caregiverId, contactId, contact) {
+  return profileRequest(`/api/v1/caregivers/${caregiverId}/emergency-contacts/${contactId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(contact)
+  })
+}
+
+export async function removeEmergencyContact(caregiverId, contactId) {
+  const response = await fetch(`/api/v1/caregivers/${caregiverId}/emergency-contacts/${contactId}`, {
+    method: 'DELETE',
+    headers: authenticatedHeaders()
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(body.detail || 'Não foi possível remover o contacto de emergência.')
+  }
+}
+
+export async function askNavigator(query) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8000)
+
+  try {
+    const response = await fetch('/api/v1/ai/navigate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: controller.signal
+    })
+    if (!response.ok) throw new Error('O assistente está temporariamente indisponível.')
+
+    const body = await response.json()
+    if (typeof body?.answer !== 'string' || !body.answer.trim()) {
+      throw new Error('O assistente devolveu uma resposta inválida.')
+    }
+    return body
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('O assistente demorou demasiado tempo a responder.')
+    }
+    if (error instanceof TypeError || error instanceof SyntaxError) {
+      throw new Error('Não foi possível obter uma resposta do assistente.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 }
