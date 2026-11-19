@@ -98,8 +98,34 @@ class ServiceApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].verified").value(true))
+                .andExpect(jsonPath("$[0].source").value("Test Day Centre"))
                 .andExpect(jsonPath("$[0].lastUpdated").isNotEmpty())
                 .andExpect(jsonPath("$[0].contactPhone").isNotEmpty());
+    }
+
+    @Test
+    void returnsServiceDetailsWithSourceAndLastUpdate() throws Exception {
+        String serviceId = supportServiceRepository.findAll().stream()
+                .filter(service -> service.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow()
+                .getId()
+                .toString();
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(serviceId))
+                .andExpect(jsonPath("$.name").value("Test Pharmacy"))
+                .andExpect(jsonPath("$.source").value("Test Pharmacy"))
+                .andExpect(jsonPath("$.verified").value(true))
+                .andExpect(jsonPath("$.contactPhone").value("+351220000000"))
+                .andExpect(jsonPath("$.lastUpdated").isNotEmpty());
+    }
+
+    @Test
+    void returnsNotFoundForUnknownServiceId() throws Exception {
+        mockMvc.perform(get("/api/v1/services/00000000-0000-0000-0000-000000000000"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

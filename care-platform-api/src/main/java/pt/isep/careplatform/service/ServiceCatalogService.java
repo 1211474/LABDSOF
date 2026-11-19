@@ -1,14 +1,17 @@
 package pt.isep.careplatform.service;
 
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import pt.isep.careplatform.dto.ServiceResponse;
 import pt.isep.careplatform.entity.ServiceType;
 import pt.isep.careplatform.entity.SupportService;
 import pt.isep.careplatform.repository.SupportServiceRepository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
@@ -37,5 +40,11 @@ public class ServiceCatalogService {
         return services.stream()
                 .map(ServiceResponse::from)
                 .toList();
+    }
+
+    public ServiceResponse getById(UUID id) {
+        SupportService service = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado"));
+        return ServiceResponse.from(service);
     }
 }

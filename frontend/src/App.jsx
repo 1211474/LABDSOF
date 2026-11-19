@@ -6,6 +6,7 @@ import {
   createCaregiverProfile,
   fetchCaregiverProfile,
   fetchCurrentUser,
+  fetchServiceDetails,
   fetchServices,
   login,
   removeCareRecipient,
@@ -96,6 +97,9 @@ export default function App() {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [serviceDetail, setServiceDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
 
   const [type, setType] = useState('')
   const [location, setLocation] = useState('')
@@ -338,6 +342,26 @@ export default function App() {
   function handleSearch(event) {
     event.preventDefault()
     void loadServices({ type, coarseLocation: location })
+  }
+
+  async function handleViewDetails(serviceId) {
+    setDetailLoading(true)
+    setDetailError('')
+    setServiceDetail(null)
+
+    try {
+      const detail = await fetchServiceDetails(serviceId)
+      setServiceDetail(detail)
+    } catch (requestError) {
+      setDetailError(requestError.message)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  function handleCloseDetails() {
+    setServiceDetail(null)
+    setDetailError('')
   }
 
   async function handleAsk(event) {
@@ -818,6 +842,89 @@ export default function App() {
         </form>
       </section>
 
+      {detailLoading || detailError || serviceDetail ? (
+        <section className="mb-8" aria-labelledby="service-detail-title">
+          <button
+            className="mb-4 font-bold text-sky-900 underline"
+            type="button"
+            onClick={handleCloseDetails}
+          >
+            ← Voltar aos resultados
+          </button>
+
+          {detailLoading ? (
+            <p className="rounded-xl border-2 border-slate-300 bg-white p-5" role="status">
+              A carregar detalhes do serviço...
+            </p>
+          ) : null}
+
+          {detailError ? (
+            <p className="rounded-xl border-2 border-red-700 bg-red-50 p-5 font-semibold text-red-950" role="alert">
+              {detailError}
+            </p>
+          ) : null}
+
+          {serviceDetail ? (
+            <article className="rounded-2xl border-2 border-slate-300 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 id="service-detail-title" className="text-2xl font-bold">{serviceDetail.name}</h2>
+                  <p className="text-slate-700">
+                    {TYPE_LABELS[serviceDetail.type] ?? serviceDetail.type} · {serviceDetail.coarseLocation}
+                  </p>
+                </div>
+                <span
+                  className={`inline-block rounded-full border-2 px-4 py-1 text-sm font-bold ${
+                    STATUS_STYLES[serviceDetail.currentStatus] ?? STATUS_STYLES.UNKNOWN
+                  }`}
+                >
+                  {STATUS_LABELS[serviceDetail.currentStatus] ?? serviceDetail.currentStatus}
+                </span>
+              </div>
+
+              <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <dt className="font-semibold">Horário</dt>
+                  <dd>{serviceDetail.operatingHours}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold">Fonte da informação</dt>
+                  <dd data-testid="service-detail-source">{serviceDetail.source}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold">Última atualização</dt>
+                  <dd data-testid="service-detail-last-updated">{formatDate(serviceDetail.lastUpdated)}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <span
+                  className={`rounded-lg border-2 px-3 py-1 text-sm font-bold ${
+                    serviceDetail.verified
+                      ? 'border-emerald-700 bg-emerald-50 text-emerald-950'
+                      : 'border-amber-700 bg-amber-50 text-amber-950'
+                  }`}
+                >
+                  {serviceDetail.verified ? 'Fonte oficial verificada' : 'Fonte comunitária (não verificada)'}
+                </span>
+
+                <a
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900"
+                  href={`tel:${serviceDetail.contactPhone}`}
+                  aria-label={`Ligar para ${serviceDetail.name}`}
+                >
+                  Ligar agora
+                </a>
+              </div>
+
+              <p className="mt-6 rounded-xl border-2 border-amber-700 bg-amber-50 p-4 font-semibold text-amber-950">
+                A disponibilidade em tempo real não é garantida. Confirme sempre diretamente por telefone.
+              </p>
+            </article>
+          ) : null}
+        </section>
+      ) : (
+
       <section aria-labelledby="results-title" aria-live="polite">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
           <h2 id="results-title" className="text-2xl font-bold">
@@ -888,13 +995,22 @@ export default function App() {
                     {service.verified ? 'Fonte oficial verificada' : 'Fonte comunitária (não verificada)'}
                   </span>
 
-                  <a
-                    className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900"
-                    href={`tel:${service.contactPhone}`}
-                    aria-label={`Ligar para ${service.name}`}
-                  >
-                    Ligar agora
-                  </a>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-sky-800 px-6 py-3 text-lg font-bold text-sky-900 hover:bg-sky-50"
+                      type="button"
+                      onClick={() => void handleViewDetails(service.id)}
+                    >
+                      Ver detalhes
+                    </button>
+                    <a
+                      className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900"
+                      href={`tel:${service.contactPhone}`}
+                      aria-label={`Ligar para ${service.name}`}
+                    >
+                      Ligar agora
+                    </a>
+                  </div>
                 </div>
               </article>
             </li>
@@ -905,6 +1021,7 @@ export default function App() {
           A disponibilidade em tempo real não é garantida. Confirme sempre diretamente por telefone.
         </p>
       </section>
+      )}
     </main>
   )
 }
