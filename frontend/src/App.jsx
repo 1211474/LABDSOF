@@ -899,6 +899,10 @@ export default function App() {
                     <dt className="font-semibold">Última atualização</dt>
                     <dd>{formatDate(service.lastUpdated)}</dd>
                   </div>
+                  <div>
+                    <dt className="font-semibold">Fonte</dt>
+                    <dd>{service.source ?? 'Diretório de serviços da plataforma'}</dd>
+                  </div>
                 </dl>
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

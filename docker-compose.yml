@@ -23,6 +23,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-careplatform}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-careplatform}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-careplatform}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "8080:8080"
     depends_on:
@@ -39,6 +40,7 @@ services:
     build: ./support-assistant-service
     environment:
       CARE_PLATFORM_BASE_URL: http://care-platform-api:8080
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "8081:8081"
     depends_on:

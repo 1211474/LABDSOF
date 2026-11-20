@@ -57,6 +57,19 @@ npm run dev
 
 The frontend runs at <http://localhost:5173> and proxies `/api/v1/ai` to port 8081 and other `/api` calls to port 8080.
 
+## Standard service search (US05)
+
+The Care Platform API provides the caregiver's standard search and filter fallback:
+
+```bash
+curl 'http://localhost:8080/api/v1/services?type=PHARMACY&coarseLocation=Boavista'
+```
+
+Both `type` and `coarseLocation` are optional. Results are ordered by service name within
+the selected filters and include the service `source`, verification state, location, status,
+and `lastUpdated` timestamp. The frontend displays these trust signals and a phone contact
+action for each result.
+
 ## Plain-language service navigation (US06)
 
 The Support Assistant Service accepts a caregiver's question in plain language and translates it

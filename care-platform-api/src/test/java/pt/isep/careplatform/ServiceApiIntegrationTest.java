@@ -98,6 +98,7 @@ class ServiceApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].verified").value(true))
+                .andExpect(jsonPath("$[0].source").value("Test Day Centre"))
                 .andExpect(jsonPath("$[0].lastUpdated").isNotEmpty())
                 .andExpect(jsonPath("$[0].contactPhone").isNotEmpty());
     }
