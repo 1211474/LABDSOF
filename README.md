@@ -136,8 +136,31 @@ and number of grounded records:
 The UI shows this source line and each result's last-update date. This release still uses
 deterministic keyword interpretation, so no external LLM prompt is sent; the same allowlist is the
 boundary that would constrain any model provider added later.
-
 ## Run the tests
+
+## GitHub environments and Pages
+
+The repository includes CI for `main` and `staging`, plus a GitHub Pages workflow that builds
+the frontend for whichever branch is pushed.
+
+Configure these repository or environment variables under **Settings > Environments**:
+
+| Environment | Variable | Value |
+| --- | --- | --- |
+| `staging` | `VITE_API_BASE_URL` | Public base URL of the staging Care Platform API |
+| `staging` | `CORS_ALLOWED_ORIGINS` | GitHub Pages origin for staging |
+| `production` | `VITE_API_BASE_URL` | Public base URL of the production Care Platform API |
+| `production` | `CORS_ALLOWED_ORIGINS` | GitHub Pages origin for production |
+
+Set the frontend API variable to the public HTTPS origin of the platform API, for example
+`https://api-staging.example.com`. The support assistant base URL must be separate only when it
+is exposed by a different public service. Currently, the frontend sends AI requests to
+`VITE_API_BASE_URL/api/v1/ai/navigate`.
+
+Before the first Pages deployment, enable **Settings > Pages > Build and deployment > GitHub
+Actions**. GitHub Pages provides one site per repository, so pushes to `staging` and `main`
+will deploy to the same Pages URL. The GitHub environment records which branch supplied the
+deployment, but branch builds cannot have simultaneous URLs in this repository configuration.
 
 Backend:
 
