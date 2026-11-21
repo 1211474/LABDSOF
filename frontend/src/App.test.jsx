@@ -55,6 +55,51 @@ describe('App', () => {
     expect(screen.queryByRole('link', { name: /ligar para farmácia da boavista/i })).not.toBeInTheDocument()
   })
 
+  it('opens the service detail page showing source, last update, call button and disclaimer', async () => {
+    const serviceDetail = {
+      ...services[0],
+      source: 'Farmácia da Boavista, Lda.'
+    }
+
+    global.fetch = vi.fn((url) => {
+      if (url === `/api/v1/services/${services[0].id}`) {
+        return Promise.resolve({ ok: true, json: async () => serviceDetail })
+      }
+      return Promise.resolve({ ok: true, json: async () => services })
+    })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+
+    fireEvent.click(screen.getByRole('button', { name: /ver detalhes/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Farmácia da Boavista', level: 2 })).toBeInTheDocument()
+    expect(screen.getByTestId('service-detail-source')).toHaveTextContent('Farmácia da Boavista, Lda.')
+    expect(screen.getByTestId('service-detail-last-updated')).not.toBeEmptyDOMElement()
+    expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
+      .toHaveAttribute('href', 'tel:+351220000001')
+    expect(screen.getByText(/disponibilidade em tempo real não é garantida/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /voltar aos resultados/i }))
+    expect(screen.queryByTestId('service-detail-source')).not.toBeInTheDocument()
+  })
+
+  it('shows an error when the service detail request fails', async () => {
+    global.fetch = vi.fn((url) => {
+      if (url === `/api/v1/services/${services[0].id}`) {
+        return Promise.resolve({ ok: false, status: 404 })
+      }
+      return Promise.resolve({ ok: true, json: async () => services })
+    })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+
+    fireEvent.click(screen.getByRole('button', { name: /ver detalhes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível carregar os detalhes/i)
+  })
+
   it('sends a plain-language question and renders the navigator answer', async () => {
     const navigatorResponse = {
       answer:

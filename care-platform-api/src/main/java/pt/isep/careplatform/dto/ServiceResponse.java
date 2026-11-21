@@ -16,6 +16,7 @@ public record ServiceResponse(
         String operatingHours,
         ServiceStatus currentStatus,
         String contactPhone,
+        String source,
         boolean verified,
         Instant lastUpdated
 ) {
@@ -30,6 +31,7 @@ public record ServiceResponse(
                 service.getOperatingHours(),
                 service.getCurrentStatus(),
                 service.getContactPhone(),
+                service.getOrganisation().getName(),
                 service.isVerified(),
                 service.getLastUpdated()
         );
