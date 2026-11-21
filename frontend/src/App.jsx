@@ -70,6 +70,29 @@ function formatDate(value) {
   }).format(date)
 }
 
+function ServiceContact({ service }) {
+  const phone = typeof service.contactPhone === 'string' ? service.contactPhone.trim() : ''
+
+  return (
+    <div className="mt-4">
+      {phone ? (
+        <a
+          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900"
+          href={`tel:${phone}`}
+          aria-label={`Ligar para ${service.name}`}
+        >
+          Ligar agora
+        </a>
+      ) : (
+        <p className="font-semibold text-slate-700">Contacto telefónico indisponível.</p>
+      )}
+      <p className="mt-2 text-sm font-semibold text-amber-950">
+        A disponibilidade em tempo real não é garantida. Confirme sempre diretamente por telefone.
+      </p>
+    </div>
+  )
+}
+
 export default function App() {
   const [authUser, setAuthUser] = useState(null)
   const [email, setEmail] = useState('')
@@ -777,6 +800,7 @@ export default function App() {
                         Atualizado em {new Date(service.lastUpdated).toLocaleDateString('pt-PT')}
                       </span>
                     ) : null}
+                    <ServiceContact service={service} />
                   </li>
                 ))}
               </ul>
@@ -995,31 +1019,20 @@ export default function App() {
                     {service.verified ? 'Fonte oficial verificada' : 'Fonte comunitária (não verificada)'}
                   </span>
 
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-sky-800 px-6 py-3 text-lg font-bold text-sky-900 hover:bg-sky-50"
-                      type="button"
-                      onClick={() => void handleViewDetails(service.id)}
-                    >
-                      Ver detalhes
-                    </button>
-                    <a
-                      className="inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-800 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-900"
-                      href={`tel:${service.contactPhone}`}
-                      aria-label={`Ligar para ${service.name}`}
-                    >
-                      Ligar agora
-                    </a>
-                  </div>
+                  <button
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-sky-800 px-6 py-3 text-lg font-bold text-sky-900 hover:bg-sky-50"
+                    type="button"
+                    onClick={() => void handleViewDetails(service.id)}
+                  >
+                    Ver detalhes
+                  </button>
                 </div>
+                <ServiceContact service={service} />
               </article>
             </li>
           ))}
         </ul>
 
-        <p className="mt-6 rounded-xl border-2 border-amber-700 bg-amber-50 p-4 font-semibold text-amber-950">
-          A disponibilidade em tempo real não é garantida. Confirme sempre diretamente por telefone.
-        </p>
       </section>
       )}
     </main>
