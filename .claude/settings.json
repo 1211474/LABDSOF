@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn *)",
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(npm ci)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps*)",
+      "Bash(curl -fsS http://localhost:*)",
+      "Bash(curl -fsS -X POST http://localhost:*)",
+      "Bash(pkill -f \"spring-boot:run\")",
+      "Bash(pkill -f \"vite\")",
+      "Skill(run-app)",
+      "Skill(run-tests)",
+      "Skill(verify-app)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secrets/**)",
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ]
+  }
+}
