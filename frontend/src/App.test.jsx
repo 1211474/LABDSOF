@@ -7,6 +7,7 @@ const services = [
     id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     organisationId: '11111111-1111-1111-1111-111111111111',
     name: 'Farmácia da Boavista',
+    source: 'Diretório oficial da plataforma',
     type: 'PHARMACY',
     coarseLocation: 'Boavista',
     operatingHours: '08:00 - 22:00',
@@ -39,6 +40,7 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
       .toHaveAttribute('href', 'tel:+351220000001')
     expect(screen.getByText('Fonte oficial verificada')).toBeInTheDocument()
+    expect(screen.getByText('Diretório oficial da plataforma', { selector: 'dd' })).toBeInTheDocument()
     const result = screen.getByRole('heading', { name: 'Farmácia da Boavista' }).closest('article')
     expect(within(result).getByText(/disponibilidade em tempo real não é garantida.*confirme.*telefone/i))
       .toBeInTheDocument()
