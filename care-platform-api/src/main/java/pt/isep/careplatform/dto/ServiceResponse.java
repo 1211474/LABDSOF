@@ -10,7 +10,6 @@ import java.util.UUID;
 public record ServiceResponse(
         UUID id,
         UUID organisationId,
-        String source,
         String name,
         ServiceType type,
         String coarseLocation,
@@ -26,7 +25,6 @@ public record ServiceResponse(
         return new ServiceResponse(
                 service.getId(),
                 service.getOrganisation().getId(),
-                service.getOrganisation().getName(),
                 service.getName(),
                 service.getType(),
                 service.getCoarseLocation(),
