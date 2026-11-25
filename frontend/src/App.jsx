@@ -773,10 +773,31 @@ export default function App() {
 
         {assistantResult ? (
           <div className="mt-4 rounded-xl border-2 border-slate-300 bg-slate-50 p-4" aria-live="polite">
-            <p className="font-semibold">{assistantResult.answer}</p>
-            {assistantResult.isFallback ? (
+            {assistantResult.refusal ? (
+              <div className="mt-1 rounded-xl border-2 border-red-700 bg-red-50 p-4" data-testid="assistant-refusal" role="alert">
+                <p className="font-bold text-red-950">Não posso ajudar com esse pedido</p>
+                <p className="mt-1 text-red-950">{assistantResult.refusal.reason}</p>
+                <ul className="mt-2 space-y-1">
+                  {assistantResult.refusal.contacts?.map((contact) => (
+                    <li key={contact.uri}>
+                      <a className="font-bold underline" href={contact.uri}>
+                        {contact.label} ({contact.phoneNumber})
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="font-semibold">{assistantResult.answer}</p>
+            )}
+            {!assistantResult.refusal && assistantResult.isFallback ? (
               <p className="mt-2 text-sm font-semibold text-amber-900">
                 Modo de contingência: a pergunta foi interpretada por palavras-chave sobre os dados do diretório.
+              </p>
+            ) : null}
+            {!assistantResult.refusal && !assistantResult.isFallback ? (
+              <p className="mt-2 text-sm font-semibold text-sky-900">
+                Resposta gerada com IA apenas a partir dos registos verificados do diretório.
               </p>
             ) : null}
             {assistantResult.sourceContext ? (

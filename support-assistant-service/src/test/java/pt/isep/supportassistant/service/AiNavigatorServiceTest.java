@@ -3,13 +3,17 @@ package pt.isep.supportassistant.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.ResourceAccessException;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
 import pt.isep.supportassistant.dto.CareServiceDto;
 import pt.isep.supportassistant.dto.GroundedService;
+import pt.isep.supportassistant.dto.RefusalCategory;
 import pt.isep.supportassistant.integration.CarePlatformClient;
+import pt.isep.supportassistant.integration.LlmCompletionException;
+import pt.isep.supportassistant.integration.LlmProvider;
 
 import java.lang.reflect.RecordComponent;
 import java.time.Instant;
@@ -19,9 +23,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,12 +37,22 @@ class AiNavigatorServiceTest {
     @Mock
     private CarePlatformClient carePlatformClient;
 
+    @Mock
+    private LlmProvider llmProvider;
+
     private AiNavigatorService aiNavigatorService;
 
     @BeforeEach
     void setUp() {
+        AssistantSafetyClassifier classifier = new AssistantSafetyClassifier();
         aiNavigatorService = new AiNavigatorService(
-                new VerifiedServiceGrounding(carePlatformClient), new AssistantQueryParser());
+                new VerifiedServiceGrounding(carePlatformClient),
+                new AssistantQueryParser(),
+                classifier,
+                new RefusalFactory(),
+                new GroundedAnswerGenerator(),
+                new GroundedAnswerValidator(classifier),
+                llmProvider);
     }
 
     @Test
@@ -330,6 +347,100 @@ class AiNavigatorServiceTest {
 
         assertThatThrownBy(() -> aiNavigatorService.navigate("ajuda"))
                 .isInstanceOf(AssistantUnavailableException.class);
+    }
+
+    @Test
+    void refusesEmergencyWithoutDirectoryOrModelCalls() {
+        AiNavigateResponse response = aiNavigatorService.navigate("tenho dor no peito, chamem uma ambulância");
+
+        assertThat(response.refusal().category()).isEqualTo(RefusalCategory.EMERGENCY);
+        assertThat(response.services()).isEmpty();
+        assertThat(response.answer()).contains("112", "SNS 24", "Fonte:");
+        assertThat(response.refusal().contacts())
+                .extracting("uri")
+                .containsExactly("tel:112", "tel:808242424");
+        assertThat(response.isFallback()).isFalse();
+        verifyNoInteractions(carePlatformClient, llmProvider);
+    }
+
+    @Test
+    void refusesPrescriptionRequestBeforeAnyLookup() {
+        AiNavigateResponse response = aiNavigatorService.navigate("preciso de uma receita para antibiótico");
+
+        assertThat(response.refusal().category()).isEqualTo(RefusalCategory.PRESCRIPTION);
+        assertThat(response.answer()).contains("Não posso prescrever");
+        verifyNoInteractions(carePlatformClient, llmProvider);
+    }
+
+    @Test
+    void refusesDiagnosisRequestBeforeAnyLookup() {
+        AiNavigateResponse response = aiNavigatorService.navigate("pode fazer um diagnóstico destes sintomas?");
+
+        assertThat(response.refusal().category()).isEqualTo(RefusalCategory.MEDICAL_ADVICE);
+        assertThat(response.answer()).contains("diagnósticos");
+        verifyNoInteractions(carePlatformClient, llmProvider);
+    }
+
+    @Test
+    void usesGeminiAnswerWhenEnabledAndGrounded() {
+        CareServiceDto pharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull())).thenReturn(List.of(pharmacy));
+        when(llmProvider.isEnabled()).thenReturn(true);
+        when(llmProvider.complete(anyString(), anyString()))
+                .thenReturn("A Farmácia da Boavista está aberta. Confirme a disponibilidade por telefone.");
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.isFallback()).isFalse();
+        assertThat(response.answer())
+                .contains("A Farmácia da Boavista está aberta")
+                .contains("Fonte:", VerifiedServiceGrounding.SOURCE);
+        assertThat(response.refusal()).isNull();
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).complete(anyString(), promptCaptor.capture());
+        assertThat(promptCaptor.getValue())
+                .contains("Farmácia da Boavista")
+                .doesNotContain("+351220000001", pharmacy.id().toString());
+    }
+
+    @Test
+    void fallsBackToGroundedAnswerWhenGeminiFails() {
+        CareServiceDto pharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull())).thenReturn(List.of(pharmacy));
+        when(llmProvider.isEnabled()).thenReturn(true);
+        when(llmProvider.complete(anyString(), anyString()))
+                .thenThrow(new LlmCompletionException("provider down", new RuntimeException("boom")));
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.isFallback()).isTrue();
+        assertThat(response.answer()).contains("Encontrei 1 resultado", "Fonte:");
+    }
+
+    @Test
+    void fallsBackWhenGeminiAnswerIsNotGrounded() {
+        CareServiceDto pharmacy = service("Farmácia da Boavista", "PHARMACY", "Boavista", "OPEN");
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull())).thenReturn(List.of(pharmacy));
+        when(llmProvider.isEnabled()).thenReturn(true);
+        when(llmProvider.complete(anyString(), anyString())).thenReturn("Há muitas opções maravilhosas.");
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.isFallback()).isTrue();
+        assertThat(response.answer()).contains("Encontrei 1 resultado");
+    }
+
+    @Test
+    void doesNotCallGeminiWhenNoServicesAreGrounded() {
+        when(carePlatformClient.fetchServices(eq("PHARMACY"), isNull())).thenReturn(List.of());
+        when(llmProvider.isEnabled()).thenReturn(true);
+
+        AiNavigateResponse response = aiNavigatorService.navigate("farmácias na Boavista");
+
+        assertThat(response.isFallback()).isTrue();
+        assertThat(response.answer()).contains("Não encontrei farmácias");
+        verify(llmProvider, never()).complete(anyString(), anyString());
     }
 
     private static GroundedService grounded(CareServiceDto service) {

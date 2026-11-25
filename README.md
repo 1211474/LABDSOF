@@ -103,12 +103,12 @@ unverified organisations are excluded. For example:
 }
 ```
 
-This release uses deterministic keyword interpretation rather than an external LLM, so the
-endpoint is safe to run without AI credentials. The frontend contract is ready to be backed by the
-bounded AI provider later. If the Care Platform API is unavailable, the endpoint returns `503`
-with a `fallbackUrl` pointing to the standard service search. If the assistant is unavailable,
-returns an invalid response, or takes longer than eight seconds, the frontend shows an error and
-links to the standard search; it does not display a previous answer as a new result.
+The keyword answer is always available as a fallback. When a Gemini API key is configured (see
+US08 below), Gemini may produce the wording instead; otherwise the endpoint runs entirely without
+AI credentials. If the Care Platform API is unavailable, the endpoint returns `503` with a
+`fallbackUrl` pointing to the standard service search. If the assistant is unavailable, returns an
+invalid response, or takes longer than eight seconds, the frontend shows an error and links to the
+standard search; it does not display a previous answer as a new result.
 
 ## Contact a service (US11)
 
@@ -146,9 +146,45 @@ and number of grounded records:
 }
 ```
 
-The UI shows this source line and each result's last-update date. This release still uses
-deterministic keyword interpretation, so no external LLM prompt is sent; the same allowlist is the
-boundary that would constrain any model provider added later.
+The UI shows this source line and each result's last-update date.
+
+## AI guardrails and Gemini integration (US08)
+
+The Support Assistant Service now has both an **input guardrail** and an **output guardrail** around
+the model call. Medical diagnoses, prescriptions, treatment advice and emergencies are refused
+before any directory lookup or model request is made:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/ai/navigate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"tenho dor no peito, preciso de uma ambulância"}'
+```
+
+The response has no service results and contains a `refusal` object with the category and the
+human contacts to call (`112` and SNS 24 `808 24 24 24`). The UI renders those as `tel:` links and
+keeps the same source context and limitation notices as a normal answer.
+
+For other questions, Gemini is used only when a key is present:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LLM_ENABLED` | `true` | Master switch for model calls. |
+| `LLM_API_KEY` | empty | Google AI Studio API key. Empty key disables Gemini. |
+| `LLM_MODEL` | `gemini-2.5-flash` | Model name passed to `generateContent`. |
+| `LLM_BASE_URL` | `https://generativelanguage.googleapis.com` | API origin. |
+| `LLM_TIMEOUT_MS` | `5000` | Read timeout for the provider call. |
+
+Put the key in `LLM_API_KEY` (for example in a `.env` file used by `docker compose`) — it is sent in
+the `x-goog-api-key` header and is never logged or returned to the frontend.
+
+The model receives only public, operational service facts: name, type, coarse location, opening
+hours, stored status and last-updated timestamp. Service IDs, telephone numbers, care-profile
+data and any other personal fields never leave the system boundary. The generated text is then
+validated: it must mention a grounded service, must not contain a telephone number or medical
+advice, and must not invent its own source line. If validation fails, the provider is unavailable,
+or no key is configured, the deterministic grounded answer is returned with `isFallback: true`.
+Every response still includes `sourceContext`, `limitations` and a Call/Contact action.
+
 ## Run the tests
 
 ## GitHub environments and Pages

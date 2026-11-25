@@ -7,6 +7,17 @@ public record AiNavigateResponse(
         List<GroundedService> services,
         boolean isFallback,
         List<String> limitations,
-        SourceContext sourceContext
+        SourceContext sourceContext,
+        Refusal refusal
 ) {
+
+    public AiNavigateResponse(
+            String answer,
+            List<GroundedService> services,
+            boolean isFallback,
+            List<String> limitations,
+            SourceContext sourceContext
+    ) {
+        this(answer, services, isFallback, limitations, sourceContext, null);
+    }
 }

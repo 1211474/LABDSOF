@@ -149,6 +149,48 @@ describe('App', () => {
     )
   })
 
+  it('shows refusal and human contacts for an emergency question', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => services })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          answer: 'Não posso gerir uma emergência. Ligue 112. Fonte: Orientação de segurança da plataforma.',
+          services: [],
+          isFallback: false,
+          limitations: ['O assistente não substitui serviços de emergência.'],
+          sourceContext: {
+            source: 'Orientação de segurança da plataforma',
+            retrievedAt: '2026-11-25T10:00:00Z',
+            allowedFields: [],
+            recordCount: 0
+          },
+          refusal: {
+            category: 'EMERGENCY',
+            reason: 'Não posso gerir uma emergência. Ligue imediatamente para o 112.',
+            contacts: [
+              { label: 'Emergência', phoneNumber: '112', uri: 'tel:112' },
+              { label: 'SNS 24', phoneNumber: '808242424', uri: 'tel:808242424' }
+            ]
+          }
+        })
+      })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+
+    fireEvent.change(screen.getByLabelText(/qual é a sua necessidade/i), {
+      target: { value: 'é uma emergência' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /procurar ajuda/i }))
+
+    const refusal = await screen.findByTestId('assistant-refusal')
+    expect(refusal).toHaveTextContent(/não posso gerir uma emergência/i)
+    expect(within(refusal).getByRole('link', { name: /emergência \(112\)/i })).toHaveAttribute('href', 'tel:112')
+    expect(within(refusal).getByRole('link', { name: /sns 24/i })).toHaveAttribute('href', 'tel:808242424')
+    expect(screen.queryByText(/modo de contingência/i)).not.toBeInTheDocument()
+  })
+
   it('offers the standard search when the assistant is unavailable without retaining an old answer', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => services })
