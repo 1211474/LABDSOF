@@ -1650,6 +1650,11 @@ Support Assistant Service
 
 The Support Assistant Service will be responsible for orchestrating AI requests, retrieving relevant information, constructing prompts, validating responses and handling provider errors.
 The frontend must never call the LLM provider directly. Provider credentials must remain on the backend.
+
+Implementation note (US08): the selected provider is the Gemini Developer API (Google AI Studio),
+called through the `generateContent` REST endpoint with the API key sent in the `x-goog-api-key`
+header. Input guardrails run before the call and output validation runs before any generated text
+is returned; if either fails, the deterministic grounded answer is used instead.
 ### Alternatives Considered
 #### Alternative A — Develop and train an AI model
 Rejected for the initial project.

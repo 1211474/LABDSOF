@@ -1,10 +1,19 @@
 package pt.isep.supportassistant.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
 import pt.isep.supportassistant.dto.GroundedService;
+import pt.isep.supportassistant.dto.Refusal;
+import pt.isep.supportassistant.dto.RefusalContact;
+import pt.isep.supportassistant.dto.SourceContext;
+import pt.isep.supportassistant.integration.LlmCompletionException;
+import pt.isep.supportassistant.integration.LlmProvider;
+import pt.isep.supportassistant.service.AssistantSafetyClassifier.SafetyAssessment;
 import pt.isep.supportassistant.service.VerifiedServiceGrounding.GroundingResult;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +22,7 @@ import java.util.Objects;
 @Service
 public class AiNavigatorService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AiNavigatorService.class);
     private static final int MAX_DETAILED_RESULTS = 3;
 
     private static final List<String> LIMITATIONS = List.of(
@@ -32,13 +42,36 @@ public class AiNavigatorService {
 
     private final VerifiedServiceGrounding grounding;
     private final AssistantQueryParser queryParser;
+    private final AssistantSafetyClassifier safetyClassifier;
+    private final RefusalFactory refusalFactory;
+    private final GroundedAnswerGenerator answerGenerator;
+    private final GroundedAnswerValidator answerValidator;
+    private final LlmProvider llmProvider;
 
-    public AiNavigatorService(VerifiedServiceGrounding grounding, AssistantQueryParser queryParser) {
+    public AiNavigatorService(
+            VerifiedServiceGrounding grounding,
+            AssistantQueryParser queryParser,
+            AssistantSafetyClassifier safetyClassifier,
+            RefusalFactory refusalFactory,
+            GroundedAnswerGenerator answerGenerator,
+            GroundedAnswerValidator answerValidator,
+            LlmProvider llmProvider
+    ) {
         this.grounding = grounding;
         this.queryParser = queryParser;
+        this.safetyClassifier = safetyClassifier;
+        this.refusalFactory = refusalFactory;
+        this.answerGenerator = answerGenerator;
+        this.answerValidator = answerValidator;
+        this.llmProvider = llmProvider;
     }
 
     public AiNavigateResponse navigate(String query) {
+        SafetyAssessment safety = safetyClassifier.assess(query);
+        if (safety.isUnsafe()) {
+            return refuse(safety);
+        }
+
         AssistantQuery assistantQuery = queryParser.parse(query);
 
         GroundingResult groundingResult = grounding.retrieve(assistantQuery.type());
@@ -46,9 +79,47 @@ public class AiNavigatorService {
 
         List<GroundedService> results = filterAndRank(groundedServices, assistantQuery);
         String location = resolveLocationName(assistantQuery.location(), groundedServices);
-        String answer = buildAnswer(assistantQuery, location, results);
+        String deterministicAnswer = buildAnswer(assistantQuery, location, results);
 
-        return new AiNavigateResponse(answer, results, true, LIMITATIONS, groundingResult.sourceContext());
+        if (llmProvider.isEnabled() && !results.isEmpty()) {
+            LlmPrompt prompt = answerGenerator.createPrompt(query, results);
+            try {
+                String candidate = llmProvider.complete(prompt.systemPrompt(), prompt.userPrompt());
+                if (answerValidator.isValid(candidate, results)) {
+                    StringBuilder answer = new StringBuilder(candidate);
+                    appendSource(answer, groundingResult.sourceContext().source());
+                    return new AiNavigateResponse(
+                            answer.toString(), results, false, LIMITATIONS,
+                            groundingResult.sourceContext(), null);
+                }
+                LOGGER.warn("Gemini answer failed output validation; using the grounded deterministic answer");
+            } catch (LlmCompletionException exception) {
+                LOGGER.warn("Gemini was unavailable; using the grounded deterministic answer");
+            }
+        }
+
+        return new AiNavigateResponse(
+                deterministicAnswer, results, true, LIMITATIONS, groundingResult.sourceContext(), null);
+    }
+
+    private AiNavigateResponse refuse(SafetyAssessment safety) {
+        Refusal refusal = refusalFactory.create(safety.category());
+        StringBuilder answer = new StringBuilder(refusal.reason()).append(" Contactos: ");
+
+        for (int index = 0; index < refusal.contacts().size(); index++) {
+            if (index > 0) {
+                answer.append("; ");
+            }
+            RefusalContact contact = refusal.contacts().get(index);
+            answer.append(contact.label()).append(' ').append(contact.phoneNumber());
+        }
+
+        appendSource(answer, RefusalFactory.REFUSAL_SOURCE);
+
+        SourceContext sourceContext = new SourceContext(
+                RefusalFactory.REFUSAL_SOURCE, Instant.now(), List.of(), 0);
+
+        return new AiNavigateResponse(answer.toString(), List.of(), false, LIMITATIONS, sourceContext, refusal);
     }
 
     private List<GroundedService> filterAndRank(List<GroundedService> services, AssistantQuery assistantQuery) {
@@ -167,7 +238,11 @@ public class AiNavigatorService {
     }
 
     private void appendSource(StringBuilder answer) {
-        answer.append(" Fonte: ").append(VerifiedServiceGrounding.SOURCE).append('.');
+        appendSource(answer, VerifiedServiceGrounding.SOURCE);
+    }
+
+    private void appendSource(StringBuilder answer, String source) {
+        answer.append(" Fonte: ").append(source).append('.');
     }
 
     private String statusClause(AssistantQuery.StatusPreference status) {

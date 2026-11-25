@@ -8,6 +8,14 @@ server:
 care-platform:
   base-url: ${CARE_PLATFORM_BASE_URL:http://localhost:8080}
 
+assistant:
+  llm:
+    enabled: ${LLM_ENABLED:true}
+    base-url: ${LLM_BASE_URL:https://generativelanguage.googleapis.com}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gemini-3.6-flash}
+    timeout-ms: ${LLM_TIMEOUT_MS:5000}
+
 management:
   endpoints:
     web:

@@ -7,6 +7,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import pt.isep.supportassistant.dto.AiNavigateResponse;
 import pt.isep.supportassistant.dto.GroundedService;
+import pt.isep.supportassistant.dto.Refusal;
+import pt.isep.supportassistant.dto.RefusalCategory;
+import pt.isep.supportassistant.dto.RefusalContact;
 import pt.isep.supportassistant.dto.SourceContext;
 import pt.isep.supportassistant.service.AiNavigatorService;
 import pt.isep.supportassistant.service.AssistantUnavailableException;
@@ -56,6 +59,39 @@ class AiNavigatorControllerTest {
                 .andExpect(jsonPath("$.sourceContext.source").isNotEmpty())
                 .andExpect(jsonPath("$.sourceContext.recordCount").value(1))
                 .andExpect(jsonPath("$.sourceContext.allowedFields").isArray());
+    }
+
+    @Test
+    void returnsRefusalWithRedirectContacts() throws Exception {
+        when(aiNavigatorService.navigate("emergência"))
+                .thenReturn(new AiNavigateResponse(
+                        "Não posso gerir uma emergência. Ligue 112. Fonte: Orientação de segurança da plataforma.",
+                        List.of(),
+                        false,
+                        List.of("O assistente não substitui serviços de emergência."),
+                        new SourceContext(
+                                "Orientação de segurança da plataforma",
+                                Instant.parse("2026-11-25T10:00:00Z"),
+                                List.of(),
+                                0
+                        ),
+                        new Refusal(
+                                RefusalCategory.EMERGENCY,
+                                "Não posso gerir uma emergência.",
+                                List.of(new RefusalContact("Emergência", "112", "tel:112"))
+                        )
+                ));
+
+        mockMvc.perform(post("/api/v1/ai/navigate")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"query\":\"emergência\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refusal.category").value("EMERGENCY"))
+                .andExpect(jsonPath("$.refusal.reason").isNotEmpty())
+                .andExpect(jsonPath("$.refusal.contacts[0].uri").value("tel:112"))
+                .andExpect(jsonPath("$.services").isEmpty())
+                .andExpect(jsonPath("$.sourceContext.source").isNotEmpty())
+                .andExpect(jsonPath("$.limitations").isArray());
     }
 
     @Test
