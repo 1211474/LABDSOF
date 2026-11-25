@@ -82,7 +82,7 @@ class GeminiLlmProviderTest {
     @Test
     void isDisabledWithoutAnApiKey() {
         LlmProperties properties = new LlmProperties(
-                true, "http://localhost", "", "gemini-2.5-flash", 1000);
+                true, "http://localhost", "", "gemini-3.6-flash", 1000);
 
         assertThat(new GeminiLlmProvider(null, properties).isEnabled()).isFalse();
     }
@@ -90,7 +90,7 @@ class GeminiLlmProviderTest {
     @Test
     void isDisabledWhenSwitchedOff() {
         LlmProperties properties = new LlmProperties(
-                false, "http://localhost", "test-key", "gemini-2.5-flash", 1000);
+                false, "http://localhost", "test-key", "gemini-3.6-flash", 1000);
 
         assertThat(new GeminiLlmProvider(null, properties).isEnabled()).isFalse();
     }
@@ -98,14 +98,14 @@ class GeminiLlmProviderTest {
     @Test
     void isEnabledWithKeyAndSwitchOn() {
         LlmProperties properties = new LlmProperties(
-                true, "http://localhost", "test-key", "gemini-2.5-flash", 1000);
+                true, "http://localhost", "test-key", "gemini-3.6-flash", 1000);
 
         assertThat(new GeminiLlmProvider(null, properties).isEnabled()).isTrue();
     }
 
     private void startServer(int status, String responseJson) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1beta/models/gemini-2.5-flash:generateContent", exchange -> {
+        server.createContext("/v1beta/models/gemini-3.6-flash:generateContent", exchange -> {
             capturedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             capturedKey.set(exchange.getRequestHeaders().getFirst("x-goog-api-key"));
 
@@ -122,7 +122,7 @@ class GeminiLlmProviderTest {
     private GeminiLlmProvider provider() {
         LlmProperties properties = new LlmProperties(
                 true, "http://127.0.0.1:" + server.getAddress().getPort(),
-                "test-key", "gemini-2.5-flash", 2000);
+                "test-key", "gemini-3.6-flash", 2000);
 
         return new GeminiLlmProvider(
                 RestClient.builder().baseUrl(properties.baseUrl()).build(), properties);

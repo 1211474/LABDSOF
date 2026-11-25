@@ -170,7 +170,7 @@ For other questions, Gemini is used only when a key is present:
 | --- | --- | --- |
 | `LLM_ENABLED` | `true` | Master switch for model calls. |
 | `LLM_API_KEY` | empty | Google AI Studio API key. Empty key disables Gemini. |
-| `LLM_MODEL` | `gemini-2.5-flash` | Model name passed to `generateContent`. |
+| `LLM_MODEL` | `gemini-3.6-flash` | Model name passed to `generateContent`. |
 | `LLM_BASE_URL` | `https://generativelanguage.googleapis.com` | API origin. |
 | `LLM_TIMEOUT_MS` | `5000` | Read timeout for the provider call. |
 
