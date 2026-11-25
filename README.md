@@ -185,6 +185,25 @@ advice, and must not invent its own source line. If validation fails, the provid
 or no key is configured, the deterministic grounded answer is returned with `isFallback: true`.
 Every response still includes `sourceContext`, `limitations` and a Call/Contact action.
 
+### Secrets and local API key setup
+
+Nothing secret is committed. `.env` is gitignored; `.env.example` is the template. To use Gemini
+locally:
+
+1. Create an API key at <https://aistudio.google.com/apikey> (Google AI Studio).
+2. Edit the local `.env` file and set `LLM_API_KEY=AIza...`.
+3. Restart the assistant: `docker compose up -d --build` (or
+   `docker compose restart support-assistant-service` if the container already exists).
+4. Check the grounded answer with the `/api/v1/ai/navigate` curl above. `isFallback: false` means
+   Gemini produced the wording; `true` means the deterministic fallback was used.
+
+Leaving `LLM_API_KEY` empty is fine: the assistant then serves only grounded deterministic answers,
+which is what CI does. For GitHub, store `LLM_API_KEY` under **Settings > Secrets and variables >
+Actions** (or in the `staging`/`production` environments) if a deployed instance should use
+Gemini. Do the same for `POSTGRES_PASSWORD` and any other deployment credential; the passwords in
+`docker-compose.yml` and `.env.example` are local-development defaults only. If a key is ever
+exposed, revoke and rotate it in Google AI Studio immediately.
+
 ## Run the tests
 
 ## GitHub environments and Pages
