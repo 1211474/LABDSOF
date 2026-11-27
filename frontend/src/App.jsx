@@ -5,15 +5,18 @@ import {
   askNavigator,
   createCaregiverProfile,
   fetchCaregiverProfile,
+  fetchAdminOrganisations,
   fetchCurrentUser,
   fetchServiceDetails,
   fetchServices,
   login,
   removeCareRecipient,
   removeEmergencyContact,
+  setOrganisationVerification,
   updateCareRecipient,
   updateCaregiverProfile,
-  updateEmergencyContact
+  updateEmergencyContact,
+  updateOrganisationDetails
 } from './api'
 
 const SERVICE_TYPES = [
@@ -42,6 +45,12 @@ const STATUS_STYLES = {
   CLOSED: 'border-red-700 bg-red-100 text-red-950',
   TEMPORARILY_CLOSED: 'border-amber-700 bg-amber-100 text-amber-950',
   UNKNOWN: 'border-slate-600 bg-slate-200 text-slate-950'
+}
+
+const ROLE_LABELS = {
+  CAREGIVER: 'Cuidador informal',
+  PROVIDER: 'Prestador',
+  PLATFORM_ADMIN: 'Administrador da plataforma'
 }
 
 const ACCESSIBILITY_TAGS = [
@@ -93,6 +102,70 @@ function ServiceContact({ service }) {
   )
 }
 
+function OrganisationPublicDetails({ service }) {
+  const hasDetails = service.organisationEmail
+    || service.organisationPhone
+    || service.organisationWebsite
+    || service.organisationCoarseLocation
+
+  if (!hasDetails) return null
+
+  return (
+    <dl className="mt-4 grid gap-2 sm:grid-cols-2" data-testid="organisation-public-details">
+      {service.organisationCoarseLocation ? (
+        <div>
+          <dt className="font-semibold">Zona da organização</dt>
+          <dd>{service.organisationCoarseLocation}</dd>
+        </div>
+      ) : null}
+      {service.organisationEmail ? (
+        <div>
+          <dt className="font-semibold">Email da organização</dt>
+          <dd>
+            <a className="break-all underline" href={`mailto:${service.organisationEmail}`}>
+              {service.organisationEmail}
+            </a>
+          </dd>
+        </div>
+      ) : null}
+      {service.organisationPhone ? (
+        <div>
+          <dt className="font-semibold">Telefone da organização</dt>
+          <dd>
+            <a className="underline" href={`tel:${service.organisationPhone}`}>
+              {service.organisationPhone}
+            </a>
+          </dd>
+        </div>
+      ) : null}
+      {service.organisationWebsite ? (
+        <div>
+          <dt className="font-semibold">Website</dt>
+          <dd>
+            <a
+              className="break-all underline"
+              href={service.organisationWebsite}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Visitar site da organização
+            </a>
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  )
+}
+
+function publicOrganisationFields(organisation) {
+  return {
+    organisationEmail: organisation.verified ? organisation.officialEmail : null,
+    organisationPhone: organisation.verified ? organisation.officialPhone : null,
+    organisationWebsite: organisation.verified ? organisation.website : null,
+    organisationCoarseLocation: organisation.verified ? organisation.coarseLocation : null
+  }
+}
+
 export default function App() {
   const [authUser, setAuthUser] = useState(null)
   const [email, setEmail] = useState('')
@@ -123,6 +196,15 @@ export default function App() {
   const [serviceDetail, setServiceDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
+  const [verificationLoadingId, setVerificationLoadingId] = useState(null)
+  const [verificationError, setVerificationError] = useState('')
+  const [verificationMessage, setVerificationMessage] = useState('')
+  const [adminOrganisations, setAdminOrganisations] = useState(null)
+  const [adminOrganisationsError, setAdminOrganisationsError] = useState('')
+  const [organisationDrafts, setOrganisationDrafts] = useState({})
+  const [detailsSavingId, setDetailsSavingId] = useState(null)
+  const [detailsError, setDetailsError] = useState('')
+  const [detailsMessage, setDetailsMessage] = useState('')
 
   const [type, setType] = useState('')
   const [location, setLocation] = useState('')
@@ -166,6 +248,32 @@ export default function App() {
       })
   }, [])
 
+  useEffect(() => {
+    if (authUser?.role !== 'PLATFORM_ADMIN') {
+      setAdminOrganisations([])
+      setAdminOrganisationsError('')
+      return
+    }
+
+    let active = true
+    setAdminOrganisations(null)
+    setAdminOrganisationsError('')
+    fetchAdminOrganisations()
+      .then((organisations) => {
+        if (active) setAdminOrganisations(organisations)
+      })
+      .catch((requestError) => {
+        if (active) {
+          setAdminOrganisations([])
+          setAdminOrganisationsError(requestError.message)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authUser?.role])
+
   async function loadCareProfile() {
     try {
       const profile = await fetchCaregiverProfile()
@@ -201,6 +309,8 @@ export default function App() {
   function handleLogout() {
     window.localStorage.removeItem('carebnb.token')
     setAuthUser(null)
+    setAdminOrganisations([])
+    setOrganisationDrafts({})
     setCareProfile(null)
     setProfileName('')
     setProfilePhone('')
@@ -382,6 +492,113 @@ export default function App() {
     }
   }
 
+  async function handleVerificationChange(organisation) {
+    setVerificationLoadingId(organisation.id)
+    setVerificationError('')
+    setVerificationMessage('')
+
+    try {
+      const updatedOrganisation = await setOrganisationVerification(
+        organisation.id,
+        !organisation.verified
+      )
+      setAdminOrganisations((current) => current.map((item) => (
+        item.id === updatedOrganisation.id ? updatedOrganisation : item
+      )))
+      setServices((current) => current.map((service) => (
+        service.organisationId === updatedOrganisation.id
+          ? {
+            ...service,
+            verified: updatedOrganisation.verified,
+            ...publicOrganisationFields(updatedOrganisation)
+          }
+          : service
+      )))
+      setServiceDetail((current) => (
+        current?.organisationId === updatedOrganisation.id
+          ? {
+            ...current,
+            verified: updatedOrganisation.verified,
+            ...publicOrganisationFields(updatedOrganisation)
+          }
+          : current
+      ))
+      setVerificationMessage(
+        updatedOrganisation.verified
+          ? `${updatedOrganisation.name} foi verificada.`
+          : `A verificação de ${updatedOrganisation.name} foi removida.`
+      )
+    } catch (requestError) {
+      setVerificationError(requestError.message)
+    } finally {
+      setVerificationLoadingId(null)
+    }
+  }
+
+  function handleOrganisationFieldChange(organisation, field, value) {
+    setOrganisationDrafts((current) => ({
+      ...current,
+      [organisation.id]: {
+        ...(current[organisation.id] ?? {
+          officialEmail: organisation.officialEmail ?? '',
+          officialPhone: organisation.officialPhone ?? '',
+          website: organisation.website ?? '',
+          coarseLocation: organisation.coarseLocation ?? ''
+        }),
+        [field]: value
+      }
+    }))
+  }
+
+  async function handleOrganisationDetailsSubmit(event, organisation) {
+    event.preventDefault()
+    setDetailsSavingId(organisation.id)
+    setDetailsError('')
+    setDetailsMessage('')
+
+    const details = organisationDrafts[organisation.id] ?? {
+      officialEmail: organisation.officialEmail ?? '',
+      officialPhone: organisation.officialPhone ?? '',
+      website: organisation.website ?? '',
+      coarseLocation: organisation.coarseLocation ?? ''
+    }
+
+    try {
+      const updatedOrganisation = await updateOrganisationDetails(organisation.id, details)
+      const updatedDetails = {
+        officialEmail: updatedOrganisation.officialEmail ?? '',
+        officialPhone: updatedOrganisation.officialPhone ?? '',
+        website: updatedOrganisation.website ?? '',
+        coarseLocation: updatedOrganisation.coarseLocation ?? ''
+      }
+      setAdminOrganisations((current) => current.map((item) => (
+        item.id === updatedOrganisation.id ? updatedOrganisation : item
+      )))
+      setOrganisationDrafts((current) => ({ ...current, [organisation.id]: updatedDetails }))
+      setServices((current) => current.map((service) => (
+        service.organisationId === updatedOrganisation.id
+          ? {
+            ...service,
+            ...publicOrganisationFields(updatedOrganisation)
+          }
+          : service
+      )))
+      setServiceDetail((current) => (
+        current?.organisationId === updatedOrganisation.id
+          ? {
+            ...current,
+            ...publicOrganisationFields(updatedOrganisation)
+          }
+          : current
+      ))
+      setDetailsMessage(`Os dados públicos de ${updatedOrganisation.name} foram guardados.`)
+    } catch (requestError) {
+      setDetailsError(requestError.message)
+    } finally {
+      setDetailsSavingId(null)
+    }
+  }
+
   function handleCloseDetails() {
     setServiceDetail(null)
     setDetailError('')
@@ -422,7 +639,7 @@ export default function App() {
           {authUser ? (
             <div className="rounded-xl border-2 border-emerald-700 bg-emerald-50 p-3 text-right">
               <p className="font-semibold">{authUser.email}</p>
-              <p className="text-sm">{authUser.role === 'CAREGIVER' ? 'Cuidador informal' : 'Prestador'}</p>
+              <p className="text-sm">{ROLE_LABELS[authUser.role] ?? 'Utilizador'}</p>
               <button className="mt-2 font-bold underline" type="button" onClick={handleLogout}>
                 Terminar sessão
               </button>
@@ -435,7 +652,7 @@ export default function App() {
         <section className="mb-8 rounded-2xl border-2 border-sky-800 bg-sky-50 p-5" aria-labelledby="login-title">
           <h2 id="login-title" className="text-2xl font-bold">Iniciar sessão</h2>
           <p className="mt-2 text-slate-700">
-            Entre como cuidador ou prestador para aceder às funcionalidades protegidas.
+            Entre com a sua conta para aceder às funcionalidades protegidas.
           </p>
           <form className="mt-4 grid gap-4 sm:grid-cols-[1fr_1fr_auto]" onSubmit={handleLogin}>
             <label>
@@ -469,6 +686,154 @@ export default function App() {
             </button>
           </form>
           {authError ? <p className="mt-4 font-semibold text-red-950" role="alert">{authError}</p> : null}
+        </section>
+      ) : null}
+
+      {authUser?.role === 'PLATFORM_ADMIN' ? (
+        <section
+          className="mb-8 rounded-2xl border-2 border-violet-800 bg-violet-50 p-5"
+          aria-labelledby="organisation-verification-title"
+        >
+          <h2 id="organisation-verification-title" className="text-2xl font-bold">
+            Verificação de organizações
+          </h2>
+          <p className="mt-2 text-slate-800">
+            Os contactos e a localização só ficam públicos depois de verificar a organização.
+            Os dados detalhados permanecem disponíveis aqui para análise e edição administrativa.
+            A autorização também é validada pelo servidor.
+          </p>
+
+          {adminOrganisationsError ? (
+            <p className="mt-4 font-semibold text-red-950" role="alert">
+              {adminOrganisationsError}
+            </p>
+          ) : null}
+
+          {verificationMessage ? (
+            <p className="mt-4 font-semibold text-emerald-900" role="status">
+              {verificationMessage}
+            </p>
+          ) : null}
+          {verificationError ? (
+            <p className="mt-4 font-semibold text-red-950" role="alert">
+              {verificationError}
+            </p>
+          ) : null}
+          {detailsMessage ? (
+            <p className="mt-4 font-semibold text-emerald-900" role="status">
+              {detailsMessage}
+            </p>
+          ) : null}
+          {detailsError ? (
+            <p className="mt-4 font-semibold text-red-950" role="alert">
+              {detailsError}
+            </p>
+          ) : null}
+
+          {adminOrganisations === null ? (
+            <p className="mt-4 rounded-xl border-2 border-slate-300 bg-white p-4" role="status">
+              A carregar organizações...
+            </p>
+          ) : adminOrganisationsError ? null : adminOrganisations.length === 0 ? (
+            <p className="mt-4 rounded-xl border-2 border-slate-300 bg-white p-4">
+              Não há organizações registadas.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {adminOrganisations.map((organisation) => (
+                <li
+                  className="rounded-xl border-2 border-slate-300 bg-white p-4"
+                  key={organisation.id}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold">{organisation.name}</h3>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {organisation.verified ? 'Verificada' : 'Por verificar'}
+                      </p>
+                    </div>
+                    <button
+                      className="min-h-12 rounded-xl border-2 border-violet-900 px-5 py-3 font-bold text-violet-950 hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60"
+                      type="button"
+                      disabled={verificationLoadingId !== null || detailsSavingId !== null}
+                      onClick={() => void handleVerificationChange(organisation)}
+                    >
+                      {verificationLoadingId === organisation.id
+                        ? 'A guardar...'
+                        : organisation.verified
+                          ? 'Revogar verificação'
+                          : 'Verificar organização'}
+                    </button>
+                  </div>
+                  <h4 className="mt-4 font-bold">Contactos públicos e localização</h4>
+                  <form
+                    className="mt-3 grid gap-3 sm:grid-cols-2"
+                    onSubmit={(event) => void handleOrganisationDetailsSubmit(event, organisation)}
+                  >
+                    <label>
+                      <span className="block font-semibold">Email oficial</span>
+                      <input
+                        className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-3 py-2"
+                        type="email"
+                        maxLength={320}
+                        value={(organisationDrafts[organisation.id] ?? organisation).officialEmail ?? ''}
+                        onChange={(event) => handleOrganisationFieldChange(
+                          organisation, 'officialEmail', event.target.value
+                        )}
+                        disabled={detailsSavingId !== null || verificationLoadingId !== null}
+                      />
+                    </label>
+                    <label>
+                      <span className="block font-semibold">Telefone oficial</span>
+                      <input
+                        className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-3 py-2"
+                        type="tel"
+                        maxLength={40}
+                        value={(organisationDrafts[organisation.id] ?? organisation).officialPhone ?? ''}
+                        onChange={(event) => handleOrganisationFieldChange(
+                          organisation, 'officialPhone', event.target.value
+                        )}
+                        disabled={detailsSavingId !== null || verificationLoadingId !== null}
+                      />
+                    </label>
+                    <label>
+                      <span className="block font-semibold">Website (HTTP ou HTTPS)</span>
+                      <input
+                        className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-3 py-2"
+                        type="url"
+                        maxLength={2048}
+                        value={(organisationDrafts[organisation.id] ?? organisation).website ?? ''}
+                        onChange={(event) => handleOrganisationFieldChange(
+                          organisation, 'website', event.target.value
+                        )}
+                        disabled={detailsSavingId !== null || verificationLoadingId !== null}
+                      />
+                    </label>
+                    <label>
+                      <span className="block font-semibold">Zona aproximada</span>
+                      <input
+                        className="mt-1 min-h-12 w-full rounded-xl border-2 border-slate-500 bg-white px-3 py-2"
+                        type="text"
+                        maxLength={120}
+                        value={(organisationDrafts[organisation.id] ?? organisation).coarseLocation ?? ''}
+                        onChange={(event) => handleOrganisationFieldChange(
+                          organisation, 'coarseLocation', event.target.value
+                        )}
+                        disabled={detailsSavingId !== null || verificationLoadingId !== null}
+                      />
+                    </label>
+                    <button
+                      className="min-h-12 rounded-xl bg-violet-900 px-5 py-3 font-bold text-white hover:bg-violet-950 disabled:cursor-wait disabled:opacity-60 sm:col-span-2"
+                      type="submit"
+                      disabled={detailsSavingId !== null || verificationLoadingId !== null}
+                    >
+                      {detailsSavingId === organisation.id ? 'A guardar...' : 'Guardar dados públicos'}
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       ) : null}
 
@@ -942,6 +1307,8 @@ export default function App() {
                 </div>
               </dl>
 
+              <OrganisationPublicDetails service={serviceDetail} />
+
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <span
                   className={`rounded-lg border-2 px-3 py-1 text-sm font-bold ${
@@ -1032,6 +1399,8 @@ export default function App() {
                     <dd>{service.source ?? 'Diretório de serviços da plataforma'}</dd>
                   </div>
                 </dl>
+
+                <OrganisationPublicDetails service={service} />
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <span
