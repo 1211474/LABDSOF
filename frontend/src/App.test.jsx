@@ -40,7 +40,7 @@ describe('App', () => {
     expect(await screen.findByText('Farmácia da Boavista')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ligar para farmácia da boavista/i }))
       .toHaveAttribute('href', 'tel:+351220000001')
-    expect(screen.getByText('Fonte oficial verificada')).toBeInTheDocument()
+    expect(screen.getByText('Estado Oficial')).toBeInTheDocument()
     expect(screen.getByText('Diretório oficial da plataforma', { selector: 'dd' })).toBeInTheDocument()
     const result = screen.getByRole('heading', { name: 'Farmácia da Boavista' }).closest('article')
     expect(within(result).getByText(/disponibilidade em tempo real não é garantida.*confirme.*telefone/i))
@@ -95,7 +95,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Verificar organização' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('foi verificada')
-    expect(screen.getAllByText('Fonte oficial verificada')).toHaveLength(1)
+    expect(screen.getAllByText('Estado Oficial')).toHaveLength(1)
     expect(global.fetch).toHaveBeenCalledWith(
       `/api/v1/admin/organisations/${services[0].organisationId}/verification`,
       expect.objectContaining({
@@ -104,6 +104,68 @@ describe('App', () => {
         body: JSON.stringify({ verified: true })
       })
     )
+  })
+
+  it('lets a platform admin assign a provider to an organisation', async () => {
+    const organisation = {
+      id: services[0].organisationId,
+      name: 'Farmácia da Boavista',
+      verified: true,
+      officialEmail: null,
+      officialPhone: null,
+      website: null,
+      coarseLocation: null
+    }
+    const provider = {
+      id: 'provider-1',
+      email: 'sofia@example.com',
+      organisationId: null,
+      organisationName: null,
+      organisationVerified: false
+    }
+    const assignedProvider = {
+      ...provider,
+      organisationId: organisation.id,
+      organisationName: organisation.name,
+      organisationVerified: true
+    }
+    global.fetch = vi.fn((url, options = {}) => {
+      if (url === '/api/v1/auth/login') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            token: 'admin-token',
+            role: 'PLATFORM_ADMIN',
+            permissions: ['VERIFY_ORGANISATIONS']
+          })
+        })
+      }
+      if (url === '/api/v1/admin/organisations') {
+        return Promise.resolve({ ok: true, json: async () => [organisation] })
+      }
+      if (url === '/api/v1/admin/providers') {
+        return Promise.resolve({ ok: true, json: async () => [provider] })
+      }
+      if (url === '/api/v1/admin/providers/provider-1/organisation') {
+        expect(options.body).toBe(JSON.stringify({ organisationId: organisation.id }))
+        return Promise.resolve({ ok: true, json: async () => assignedProvider })
+      }
+      return Promise.resolve({ ok: true, json: async () => services })
+    })
+
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'admin@example.com' } })
+    fireEvent.change(screen.getByLabelText('Palavra-passe'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('sofia@example.com')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Organização'), { target: { value: organisation.id } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar associação' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'sofia@example.com foi associado a Farmácia da Boavista'
+    )
+    expect(screen.getByText(/Organização atual: Farmácia da Boavista/)).toBeInTheDocument()
   })
 
   it('lets a platform admin edit public organisation details', async () => {

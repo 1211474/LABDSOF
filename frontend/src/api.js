@@ -21,6 +21,29 @@ export async function fetchServiceDetails(serviceId) {
   return response.json()
 }
 
+export async function fetchProviderServices() {
+  const response = await fetch(apiUrl('/api/v1/services/provider/me'), {
+    headers: authenticatedHeaders()
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(body.detail || 'Não foi possível carregar os seus serviços.')
+  return body
+}
+
+export async function updateProviderServiceStatus(serviceId, update) {
+  const response = await fetch(apiUrl(`/api/v1/services/${serviceId}/provider-status`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authenticatedHeaders()
+    },
+    body: JSON.stringify(update)
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(body.detail || 'Não foi possível guardar o estado do serviço.')
+  return body
+}
+
 export async function login(email, password) {
   const response = await fetch(apiUrl('/api/v1/auth/login'), {
     method: 'POST',
@@ -52,6 +75,33 @@ export async function fetchAdminOrganisations() {
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(body.detail || 'Não foi possível carregar as organizações.')
+  }
+  return body
+}
+
+export async function fetchAdminProviders() {
+  const response = await fetch(apiUrl('/api/v1/admin/providers'), {
+    headers: authenticatedHeaders()
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.detail || 'Não foi possível carregar os prestadores.')
+  }
+  return body
+}
+
+export async function assignProviderOrganisation(providerId, organisationId) {
+  const response = await fetch(apiUrl(`/api/v1/admin/providers/${providerId}/organisation`), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authenticatedHeaders()
+    },
+    body: JSON.stringify({ organisationId })
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.detail || 'Não foi possível associar o prestador à organização.')
   }
   return body
 }

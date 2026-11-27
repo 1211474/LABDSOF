@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  assignProviderOrganisation,
   askNavigator,
   fetchAdminOrganisations,
+  fetchAdminProviders,
   setOrganisationVerification,
   updateOrganisationDetails
 } from './api'
@@ -95,6 +97,46 @@ describe('fetchAdminOrganisations', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/v1/admin/organisations',
       { headers: { Authorization: 'Bearer admin-token' } }
+    )
+  })
+})
+
+describe('provider organisation assignment', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    window.localStorage.clear()
+  })
+
+  it('loads providers and assigns one to an organisation using the admin token', async () => {
+    window.localStorage.setItem('carebnb.token', 'admin-token')
+    const providers = [{ id: 'provider-1', email: 'provider@example.org', organisationId: null }]
+    const assignedProvider = {
+      id: 'provider-1',
+      email: 'provider@example.org',
+      organisationId: 'org-1',
+      organisationName: 'Community Centre',
+      organisationVerified: true
+    }
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => providers })
+      .mockResolvedValueOnce({ ok: true, json: async () => assignedProvider })
+
+    await expect(fetchAdminProviders()).resolves.toEqual(providers)
+    await expect(assignProviderOrganisation('provider-1', 'org-1')).resolves.toEqual(assignedProvider)
+    expect(global.fetch).toHaveBeenNthCalledWith(1, '/api/v1/admin/providers', {
+      headers: { Authorization: 'Bearer admin-token' }
+    })
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/admin/providers/provider-1/organisation',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer admin-token'
+        },
+        body: JSON.stringify({ organisationId: 'org-1' })
+      })
     )
   })
 })

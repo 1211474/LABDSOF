@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import {
   addCareRecipient,
   addEmergencyContact,
+  assignProviderOrganisation,
   askNavigator,
   createCaregiverProfile,
   fetchCaregiverProfile,
   fetchAdminOrganisations,
+  fetchAdminProviders,
   fetchCurrentUser,
   fetchServiceDetails,
   fetchServices,
+  fetchProviderServices,
   login,
   removeCareRecipient,
   removeEmergencyContact,
@@ -16,7 +19,8 @@ import {
   updateCareRecipient,
   updateCaregiverProfile,
   updateEmergencyContact,
-  updateOrganisationDetails
+  updateOrganisationDetails,
+  updateProviderServiceStatus
 } from './api'
 
 const SERVICE_TYPES = [
@@ -201,10 +205,20 @@ export default function App() {
   const [verificationMessage, setVerificationMessage] = useState('')
   const [adminOrganisations, setAdminOrganisations] = useState(null)
   const [adminOrganisationsError, setAdminOrganisationsError] = useState('')
+  const [adminProviders, setAdminProviders] = useState(null)
+  const [adminProvidersError, setAdminProvidersError] = useState('')
+  const [providerOrganisationDrafts, setProviderOrganisationDrafts] = useState({})
+  const [providerAssignmentSavingId, setProviderAssignmentSavingId] = useState(null)
+  const [providerAssignmentMessage, setProviderAssignmentMessage] = useState('')
+  const [providerAssignmentError, setProviderAssignmentError] = useState('')
   const [organisationDrafts, setOrganisationDrafts] = useState({})
   const [detailsSavingId, setDetailsSavingId] = useState(null)
   const [detailsError, setDetailsError] = useState('')
   const [detailsMessage, setDetailsMessage] = useState('')
+  const [providerServices, setProviderServices] = useState(null)
+  const [providerServicesError, setProviderServicesError] = useState('')
+  const [providerSavingId, setProviderSavingId] = useState(null)
+  const [providerStatusMessage, setProviderStatusMessage] = useState('')
 
   const [type, setType] = useState('')
   const [location, setLocation] = useState('')
@@ -267,6 +281,60 @@ export default function App() {
           setAdminOrganisations([])
           setAdminOrganisationsError(requestError.message)
         }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authUser?.role])
+
+  useEffect(() => {
+    if (authUser?.role !== 'PLATFORM_ADMIN') {
+      setAdminProviders([])
+      setAdminProvidersError('')
+      setProviderOrganisationDrafts({})
+      return
+    }
+
+    let active = true
+    setAdminProviders(null)
+    setAdminProvidersError('')
+    fetchAdminProviders()
+      .then((providers) => {
+        if (!active) return
+        setAdminProviders(providers)
+        setProviderOrganisationDrafts(Object.fromEntries(
+          providers.map((provider) => [provider.id, provider.organisationId ?? ''])
+        ))
+      })
+      .catch((requestError) => {
+        if (active) {
+          setAdminProviders([])
+          setAdminProvidersError(requestError.message)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authUser?.role])
+
+  useEffect(() => {
+    if (authUser?.role !== 'PROVIDER') {
+      setProviderServices(null)
+      setProviderServicesError('')
+      return
+    }
+
+    let active = true
+    setProviderServices(null)
+    setProviderServicesError('')
+    fetchProviderServices()
+      .then((providerServiceList) => {
+        if (active) setProviderServices(providerServiceList)
+      })
+      .catch((requestError) => {
+        if (active) setProviderServicesError(requestError.message)
       })
 
     return () => {
@@ -492,6 +560,34 @@ export default function App() {
     }
   }
 
+  async function handleProviderStatusSave(event, service) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    setProviderSavingId(service.id)
+    setProviderStatusMessage('')
+    setProviderServicesError('')
+
+    try {
+      const updated = await updateProviderServiceStatus(service.id, {
+        status: form.get('status'),
+        operatingHours: form.get('operatingHours').trim(),
+        officialNotice: form.get('officialNotice').trim()
+      })
+      setProviderServices((current) => current.map((item) => (
+        item.id === updated.id ? updated : item
+      )))
+      setServices((current) => current.map((item) => (
+        item.id === updated.id ? updated : item
+      )))
+      setServiceDetail((current) => current?.id === updated.id ? updated : current)
+      setProviderStatusMessage(`${updated.name}: estado oficial guardado.`)
+    } catch (requestError) {
+      setProviderServicesError(requestError.message)
+    } finally {
+      setProviderSavingId(null)
+    }
+  }
+
   async function handleVerificationChange(organisation) {
     setVerificationLoadingId(organisation.id)
     setVerificationError('')
@@ -532,6 +628,37 @@ export default function App() {
       setVerificationError(requestError.message)
     } finally {
       setVerificationLoadingId(null)
+    }
+  }
+
+  async function handleProviderAssignmentSubmit(event, provider) {
+    event.preventDefault()
+    const organisationId = providerOrganisationDrafts[provider.id]
+    if (!organisationId) {
+      setProviderAssignmentError('Selecione uma organização.')
+      return
+    }
+
+    setProviderAssignmentSavingId(provider.id)
+    setProviderAssignmentMessage('')
+    setProviderAssignmentError('')
+
+    try {
+      const updatedProvider = await assignProviderOrganisation(provider.id, organisationId)
+      setAdminProviders((current) => current.map((item) => (
+        item.id === updatedProvider.id ? updatedProvider : item
+      )))
+      setProviderOrganisationDrafts((current) => ({
+        ...current,
+        [updatedProvider.id]: updatedProvider.organisationId
+      }))
+      setProviderAssignmentMessage(
+        `${updatedProvider.email} foi associado a ${updatedProvider.organisationName}.`
+      )
+    } catch (requestError) {
+      setProviderAssignmentError(requestError.message)
+    } finally {
+      setProviderAssignmentSavingId(null)
     }
   }
 
@@ -834,6 +961,75 @@ export default function App() {
               ))}
             </ul>
           )}
+
+          <div className="mt-8 border-t-2 border-violet-200 pt-5">
+            <h3 className="text-xl font-bold">Associar prestadores a organizações</h3>
+            <p className="mt-2 text-slate-800">
+              A associação identifica a organização do prestador; só organizações verificadas podem publicar estado oficial.
+            </p>
+            {adminProvidersError ? (
+              <p className="mt-4 font-semibold text-red-950" role="alert">{adminProvidersError}</p>
+            ) : null}
+            {providerAssignmentMessage ? (
+              <p className="mt-4 font-semibold text-emerald-950" role="status">{providerAssignmentMessage}</p>
+            ) : null}
+            {providerAssignmentError ? (
+              <p className="mt-4 font-semibold text-red-950" role="alert">{providerAssignmentError}</p>
+            ) : null}
+            {adminProviders === null ? (
+              <p className="mt-4 rounded-xl border-2 border-slate-300 bg-white p-4" role="status">
+                A carregar prestadores...
+              </p>
+            ) : adminProvidersError ? null : adminProviders.length === 0 ? (
+              <p className="mt-4">Não há contas de prestador registadas.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {adminProviders.map((provider) => (
+                  <li key={provider.id} className="rounded-xl border-2 border-slate-300 bg-white p-4">
+                    <p className="font-bold">{provider.email}</p>
+                    <p className="text-sm text-slate-700">
+                      Organização atual: {provider.organisationName ?? 'Sem organização'}
+                      {provider.organisationName
+                        ? ` · ${provider.organisationVerified ? 'Verificada' : 'Por verificar'}`
+                        : ''}
+                    </p>
+                    <form
+                      className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"
+                      onSubmit={(event) => void handleProviderAssignmentSubmit(event, provider)}
+                    >
+                      <label className="grid gap-1">
+                        Organização
+                        <select
+                          className="min-h-12 rounded-lg border-2 border-slate-500 bg-white px-3"
+                          value={providerOrganisationDrafts[provider.id] ?? ''}
+                          onChange={(event) => setProviderOrganisationDrafts((current) => ({
+                            ...current,
+                            [provider.id]: event.target.value
+                          }))}
+                          required
+                          disabled={!adminOrganisations?.length || providerAssignmentSavingId !== null}
+                        >
+                          <option value="" disabled>Selecione uma organização</option>
+                          {(adminOrganisations ?? []).map((organisation) => (
+                            <option key={organisation.id} value={organisation.id}>
+                              {organisation.name}{organisation.verified ? ' · Verificada' : ' · Por verificar'}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="min-h-12 self-end rounded-xl bg-violet-900 px-5 py-3 font-bold text-white hover:bg-violet-950 disabled:cursor-wait disabled:opacity-60"
+                        type="submit"
+                        disabled={!adminOrganisations?.length || providerAssignmentSavingId !== null}
+                      >
+                        {providerAssignmentSavingId === provider.id ? 'A guardar...' : 'Guardar associação'}
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -1204,10 +1400,79 @@ export default function App() {
       ) : (
         <section className="mb-8 rounded-2xl border-2 border-amber-700 bg-amber-50 p-5" aria-labelledby="provider-access-title">
           <h2 id="provider-access-title" className="text-xl font-bold">Área de prestador</h2>
-          <p className="mt-2 text-slate-800">
-            A pesquisa pública de serviços está disponível. As ferramentas de atualização de estado do prestador
-            serão disponibilizadas nesta área quando estiverem configuradas.
-          </p>
+          {providerServices === null ? (
+            <p className="mt-4" role="status">A carregar os seus serviços...</p>
+          ) : providerServicesError ? (
+            <p className="mt-4 font-semibold text-red-950" role="alert">{providerServicesError}</p>
+          ) : providerServices.length === 0 ? (
+            <p className="mt-4">Nenhum serviço está associado à sua organização.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {providerStatusMessage ? (
+                <p className="font-semibold text-emerald-950" role="status">{providerStatusMessage}</p>
+              ) : null}
+              {providerServices.map((service) => (
+                <form
+                  key={service.id}
+                  className="grid gap-3 rounded-xl border-2 border-amber-300 bg-white p-4"
+                  onSubmit={(event) => void handleProviderStatusSave(event, service)}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-lg font-bold">{service.name}</h3>
+                    {service.verified ? (
+                      <span className="rounded-lg border-2 border-emerald-700 bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-950">
+                        Estado Oficial
+                      </span>
+                    ) : (
+                      <span className="rounded-lg border-2 border-amber-700 bg-amber-50 px-3 py-1 text-sm font-bold">
+                        Organização por verificar
+                      </span>
+                    )}
+                  </div>
+                  <label className="grid gap-1">
+                    Estado de funcionamento
+                    <select name="status" defaultValue={service.currentStatus} className="min-h-12 rounded-lg border-2 border-slate-500 bg-white px-3">
+                      <option value="OPEN">Aberto</option>
+                      <option value="CLOSED">Fechado</option>
+                      <option value="TEMPORARILY_CLOSED">Temporariamente fechado</option>
+                      <option value="UNKNOWN">Estado desconhecido</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    Horário
+                    <input
+                      name="operatingHours"
+                      defaultValue={service.operatingHours}
+                      maxLength="120"
+                      className="min-h-12 rounded-lg border-2 border-slate-500 px-3"
+                    />
+                  </label>
+                  <label className="grid gap-1">
+                    Aviso oficial
+                    <textarea
+                      name="officialNotice"
+                      defaultValue={service.officialNotice ?? ''}
+                      maxLength="500"
+                      rows="3"
+                      className="rounded-lg border-2 border-slate-500 px-3 py-2"
+                    />
+                  </label>
+                  <button
+                    className="min-h-12 rounded-xl bg-emerald-800 px-5 py-3 text-lg font-bold text-white hover:bg-emerald-900 disabled:opacity-60"
+                    type="submit"
+                    disabled={providerSavingId === service.id || !service.verified}
+                  >
+                    {providerSavingId === service.id ? 'A guardar...' : 'Guardar estado oficial'}
+                  </button>
+                  {!service.verified ? (
+                    <p className="text-sm font-semibold text-amber-950">
+                      Só organizações verificadas podem publicar Estado Oficial.
+                    </p>
+                  ) : null}
+                </form>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -1297,6 +1562,12 @@ export default function App() {
                   <dt className="font-semibold">Horário</dt>
                   <dd>{serviceDetail.operatingHours}</dd>
                 </div>
+                {serviceDetail.officialNotice ? (
+                  <div>
+                    <dt className="font-semibold">Aviso oficial</dt>
+                    <dd>{serviceDetail.officialNotice}</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="font-semibold">Fonte da informação</dt>
                   <dd data-testid="service-detail-source">{serviceDetail.source}</dd>
@@ -1317,7 +1588,7 @@ export default function App() {
                       : 'border-amber-700 bg-amber-50 text-amber-950'
                   }`}
                 >
-                  {serviceDetail.verified ? 'Fonte oficial verificada' : 'Fonte comunitária (não verificada)'}
+                  {serviceDetail.verified ? 'Estado Oficial' : 'Fonte comunitária (não verificada)'}
                 </span>
 
                 <a
@@ -1390,6 +1661,12 @@ export default function App() {
                     <dt className="font-semibold">Horário</dt>
                     <dd>{service.operatingHours}</dd>
                   </div>
+                  {service.officialNotice ? (
+                    <div>
+                      <dt className="font-semibold">Aviso oficial</dt>
+                      <dd>{service.officialNotice}</dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt className="font-semibold">Última atualização</dt>
                     <dd>{formatDate(service.lastUpdated)}</dd>
@@ -1410,7 +1687,7 @@ export default function App() {
                         : 'border-amber-700 bg-amber-50 text-amber-950'
                     }`}
                   >
-                    {service.verified ? 'Fonte oficial verificada' : 'Fonte comunitária (não verificada)'}
+                    {service.verified ? 'Estado Oficial' : 'Fonte comunitária (não verificada)'}
                   </span>
 
                   <button

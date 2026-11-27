@@ -22,7 +22,8 @@ public record ServiceResponse(
         String organisationEmail,
         String organisationPhone,
         String organisationWebsite,
-        String organisationCoarseLocation
+        String organisationCoarseLocation,
+        String officialNotice
 ) {
 
     public static ServiceResponse from(SupportService service) {
@@ -44,7 +45,8 @@ public record ServiceResponse(
                 verified ? organisation.getOfficialEmail() : null,
                 verified ? organisation.getOfficialPhone() : null,
                 verified ? organisation.getWebsite() : null,
-                verified ? organisation.getCoarseLocation() : null
+                verified ? organisation.getCoarseLocation() : null,
+                verified ? service.getOfficialNotice() : null
         );
     }
 }

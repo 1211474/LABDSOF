@@ -7,6 +7,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Table;
 
 import java.util.UUID;
@@ -32,6 +35,10 @@ public class User {
     @Column(nullable = false)
     private boolean enabled;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organisation_id")
+    private Organisation organisation;
+
     protected User() {
     }
 
@@ -40,6 +47,11 @@ public class User {
         this.passwordHash = passwordHash;
         this.role = role;
         this.enabled = true;
+    }
+
+    public User(String email, String passwordHash, UserRole role, Organisation organisation) {
+        this(email, passwordHash, role);
+        this.organisation = organisation;
     }
 
     public UUID getId() {
@@ -60,5 +72,13 @@ public class User {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public Organisation getOrganisation() {
+        return organisation;
+    }
+
+    public void assignToOrganisation(Organisation organisation) {
+        this.organisation = organisation;
     }
 }

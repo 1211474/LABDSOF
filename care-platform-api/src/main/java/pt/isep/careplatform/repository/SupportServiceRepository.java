@@ -11,6 +11,8 @@ public interface SupportServiceRepository extends JpaRepository<SupportService, 
 
     List<SupportService> findByTypeOrderByNameAsc(ServiceType type);
 
+    List<SupportService> findByOrganisationIdOrderByNameAsc(UUID organisationId);
+
     List<SupportService> findByCoarseLocationIgnoreCaseOrderByNameAsc(String coarseLocation);
 
     List<SupportService> findByTypeAndCoarseLocationIgnoreCaseOrderByNameAsc(ServiceType type, String coarseLocation);
