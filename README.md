@@ -116,6 +116,55 @@ Each service result, including results from the assistant, provides a telephone 
 number is available. The link opens the device's calling application, and the notice beside it
 reminds caregivers to confirm availability directly. If no number is available, no call link is shown.
 
+## Verify provider organisations (US15)
+
+Only a `PLATFORM_ADMIN` can change an organisation's verification status. To create the initial
+administrator, set both `PLATFORM_ADMIN_EMAIL` and `PLATFORM_ADMIN_PASSWORD` in the untracked local
+`.env` file or deployment secret store, then start the Care Platform API. The bootstrap creates the
+account only if that email is absent; if it already belongs to a non-admin, startup fails instead
+of changing its role. Once created, remove the bootstrap values from the environment. This is a
+bootstrap mechanism, not a public admin-registration endpoint.
+
+After signing in as an administrator, the frontend shows a **Verificação de organizações** panel
+for all registered organisations. Admins can update an organisation's
+public email, telephone number, website and coarse location there. These details are returned in
+public service responses and shown to all users only while the organisation is verified. Revoking
+verification immediately hides them from public responses; administrators can still review and edit
+them through an admin-only endpoint. Exact street addresses are not stored; opening hours and
+service-specific contact numbers remain on each service. The verify/revoke and edit operations call
+the Care Platform API, which remains the authoritative authorization check:
+
+The admin panel reads organisation details from the protected
+`GET /api/v1/admin/organisations` endpoint. Public service responses return organisation contact
+fields as `null` until the organisation is verified.
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/admin/organisations/<organisation-id>/verification \
+  -H "Authorization: Bearer <platform-admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"verified":true}'
+```
+
+Set `verified` to `false` to revoke verification. The response includes the organisation's
+verification state and `verifiedAt` timestamp (null after revocation). Repeating the same request
+does not change that timestamp. Update the public details with an admin-only `PATCH` request:
+
+```bash
+curl -X PATCH http://localhost:8080/api/v1/admin/organisations/<organisation-id> \
+  -H "Authorization: Bearer <platform-admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "officialEmail":"contact@example.org",
+    "officialPhone":"+351 220 000 000",
+    "website":"https://example.org",
+    "coarseLocation":"Boavista"
+  }'
+```
+
+Omitted or `null` fields are unchanged; an empty string clears an optional field. Public service
+results expose the verification state and the organisation's public contact details. The
+provider-to-organisation assignment and status-publishing workflow are outside US15.
+
 ## Answer grounding in verified data (US07)
 
 Before any answer text is produced, the navigator runs a grounding step over the application

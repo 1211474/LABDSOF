@@ -28,6 +28,7 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup()
+    window.localStorage.clear()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -44,6 +45,224 @@ describe('App', () => {
     const result = screen.getByRole('heading', { name: 'Farmácia da Boavista' }).closest('article')
     expect(within(result).getByText(/disponibilidade em tempo real não é garantida.*confirme.*telefone/i))
       .toBeInTheDocument()
+  })
+
+  it('lets a platform admin verify an organisation and updates its service badge', async () => {
+    const unverifiedServices = services.map((service) => ({ ...service, verified: false }))
+    const updatedOrganisation = {
+      id: services[0].organisationId,
+      name: services[0].source,
+      verified: true,
+      verifiedAt: '2026-11-26T10:00:00Z'
+    }
+    const adminOrganisation = {
+      id: services[0].organisationId,
+      name: services[0].source,
+      verified: false,
+      officialEmail: null,
+      officialPhone: null,
+      website: null,
+      coarseLocation: null
+    }
+    global.fetch = vi.fn((url, options = {}) => {
+      if (url === '/api/v1/auth/login') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            token: 'admin-token',
+            role: 'PLATFORM_ADMIN',
+            permissions: ['VERIFY_ORGANISATIONS']
+          })
+        })
+      }
+      if (url === `/api/v1/admin/organisations/${services[0].organisationId}/verification`) {
+        return Promise.resolve({ ok: true, json: async () => updatedOrganisation })
+      }
+      if (url === '/api/v1/admin/organisations') {
+        return Promise.resolve({ ok: true, json: async () => [adminOrganisation] })
+      }
+      return Promise.resolve({ ok: true, json: async () => unverifiedServices })
+    })
+
+    render(<App />)
+    await screen.findByText('Fonte comunitária (não verificada)')
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'admin@example.com' } })
+    fireEvent.change(screen.getByLabelText('Palavra-passe'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('heading', { name: 'Verificação de organizações' }))
+      .toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar organização' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('foi verificada')
+    expect(screen.getAllByText('Fonte oficial verificada')).toHaveLength(1)
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/v1/admin/organisations/${services[0].organisationId}/verification`,
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({ Authorization: 'Bearer admin-token' }),
+        body: JSON.stringify({ verified: true })
+      })
+    )
+  })
+
+  it('lets a platform admin edit public organisation details', async () => {
+    const emptyDetailsServices = services.map((service) => ({
+      ...service,
+      organisationEmail: null,
+      organisationPhone: null,
+      organisationWebsite: null,
+      organisationCoarseLocation: null
+    }))
+    const updatedOrganisation = {
+      id: services[0].organisationId,
+      name: services[0].source,
+      verified: true,
+      verifiedAt: null,
+      officialEmail: 'contact@example.org',
+      officialPhone: '+351 220 000 000',
+      website: 'https://example.org',
+      coarseLocation: 'Boavista'
+    }
+    const adminOrganisation = {
+      ...updatedOrganisation,
+      officialEmail: 'old-contact@example.org'
+    }
+    global.fetch = vi.fn((url) => {
+      if (url === '/api/v1/auth/login') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            token: 'admin-token',
+            role: 'PLATFORM_ADMIN',
+            permissions: ['VERIFY_ORGANISATIONS']
+          })
+        })
+      }
+      if (url === `/api/v1/admin/organisations/${services[0].organisationId}`) {
+        return Promise.resolve({ ok: true, json: async () => updatedOrganisation })
+      }
+      if (url === '/api/v1/admin/organisations') {
+        return Promise.resolve({ ok: true, json: async () => [adminOrganisation] })
+      }
+      return Promise.resolve({ ok: true, json: async () => emptyDetailsServices })
+    })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'admin@example.com' } })
+    fireEvent.change(screen.getByLabelText('Palavra-passe'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    await screen.findByRole('heading', { name: 'Verificação de organizações' })
+    expect(await screen.findByDisplayValue('old-contact@example.org')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Email oficial'), { target: { value: updatedOrganisation.officialEmail } })
+    fireEvent.change(screen.getByLabelText('Telefone oficial'), { target: { value: updatedOrganisation.officialPhone } })
+    fireEvent.change(screen.getByLabelText('Website (HTTP ou HTTPS)'), {
+      target: { value: updatedOrganisation.website }
+    })
+    fireEvent.change(screen.getByLabelText('Zona aproximada'), {
+      target: { value: updatedOrganisation.coarseLocation }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar dados públicos' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('dados públicos')
+    expect(screen.getByRole('link', { name: updatedOrganisation.officialEmail }))
+      .toHaveAttribute('href', `mailto:${updatedOrganisation.officialEmail}`)
+    expect(screen.getByRole('link', { name: updatedOrganisation.officialPhone }))
+      .toHaveAttribute('href', `tel:${updatedOrganisation.officialPhone}`)
+    expect(screen.getByRole('link', { name: 'Visitar site da organização' }))
+      .toHaveAttribute('href', updatedOrganisation.website)
+    expect(screen.getAllByText('Boavista')).not.toHaveLength(0)
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/v1/admin/organisations/${services[0].organisationId}`,
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: expect.objectContaining({ Authorization: 'Bearer admin-token' }),
+        body: JSON.stringify({
+          officialEmail: updatedOrganisation.officialEmail,
+          officialPhone: updatedOrganisation.officialPhone,
+          website: updatedOrganisation.website,
+          coarseLocation: updatedOrganisation.coarseLocation
+        })
+      })
+    )
+  })
+
+  it('hides organisation details immediately when verification is revoked', async () => {
+    const verifiedService = {
+      ...services[0],
+      organisationEmail: 'contact@example.org',
+      organisationPhone: '+351 220 000 000',
+      organisationWebsite: 'https://example.org',
+      organisationCoarseLocation: 'Boavista'
+    }
+    const adminOrganisation = {
+      id: verifiedService.organisationId,
+      name: verifiedService.source,
+      verified: true,
+      officialEmail: verifiedService.organisationEmail,
+      officialPhone: verifiedService.organisationPhone,
+      website: verifiedService.organisationWebsite,
+      coarseLocation: verifiedService.organisationCoarseLocation
+    }
+    const unverifiedOrganisation = { ...adminOrganisation, verified: false }
+    global.fetch = vi.fn((url) => {
+      if (url === '/api/v1/auth/login') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            token: 'admin-token',
+            role: 'PLATFORM_ADMIN',
+            permissions: ['VERIFY_ORGANISATIONS']
+          })
+        })
+      }
+      if (url === '/api/v1/admin/organisations') {
+        return Promise.resolve({ ok: true, json: async () => [adminOrganisation] })
+      }
+      if (url === `/api/v1/admin/organisations/${verifiedService.organisationId}/verification`) {
+        return Promise.resolve({ ok: true, json: async () => unverifiedOrganisation })
+      }
+      return Promise.resolve({ ok: true, json: async () => [verifiedService] })
+    })
+
+    render(<App />)
+    expect(await screen.findByTestId('organisation-public-details')).toHaveTextContent('contact@example.org')
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'admin@example.com' } })
+    fireEvent.change(screen.getByLabelText('Palavra-passe'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Revogar verificação' }))
+
+    expect(await screen.findByText('Fonte comunitária (não verificada)')).toBeInTheDocument()
+    expect(screen.queryByTestId('organisation-public-details')).not.toBeInTheDocument()
+  })
+
+  it('does not show verification controls to non-admin users', async () => {
+    global.fetch = vi.fn((url) => {
+      if (url === '/api/v1/auth/login') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            token: 'caregiver-token',
+            role: 'CAREGIVER',
+            permissions: ['SEARCH_SERVICES']
+          })
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => services })
+    })
+
+    render(<App />)
+    await screen.findByText('Farmácia da Boavista')
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'caregiver@example.com' } })
+    fireEvent.change(screen.getByLabelText('Palavra-passe'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('Cuidador informal')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Verificação de organizações' }))
+      .not.toBeInTheDocument()
   })
 
   it('does not offer a call link when a service has no phone number', async () => {

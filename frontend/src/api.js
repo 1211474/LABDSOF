@@ -45,6 +45,49 @@ function authenticatedHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+export async function fetchAdminOrganisations() {
+  const response = await fetch(apiUrl('/api/v1/admin/organisations'), {
+    headers: authenticatedHeaders()
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.detail || 'Não foi possível carregar as organizações.')
+  }
+  return body
+}
+
+export async function setOrganisationVerification(organisationId, verified) {
+  const response = await fetch(apiUrl(`/api/v1/admin/organisations/${organisationId}/verification`), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authenticatedHeaders()
+    },
+    body: JSON.stringify({ verified })
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.detail || 'Não foi possível atualizar a verificação da organização.')
+  }
+  return body
+}
+
+export async function updateOrganisationDetails(organisationId, details) {
+  const response = await fetch(apiUrl(`/api/v1/admin/organisations/${organisationId}`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authenticatedHeaders()
+    },
+    body: JSON.stringify(details)
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.detail || 'Não foi possível atualizar os dados da organização.')
+  }
+  return body
+}
+
 async function profileRequest(url, options = {}) {
   const response = await fetch(url, {
     ...options,

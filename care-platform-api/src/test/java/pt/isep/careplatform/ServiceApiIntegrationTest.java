@@ -8,8 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import pt.isep.careplatform.entity.User;
 import pt.isep.careplatform.entity.UserRole;
+import pt.isep.careplatform.entity.User;
 import pt.isep.careplatform.entity.Organisation;
 import pt.isep.careplatform.entity.ServiceStatus;
 import pt.isep.careplatform.entity.ServiceType;
@@ -21,13 +21,17 @@ import pt.isep.careplatform.repository.CaregiverRepository;
 import pt.isep.careplatform.repository.EmergencyContactRepository;
 import pt.isep.careplatform.repository.UserRepository;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -58,6 +62,8 @@ class ServiceApiIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private UUID unverifiedOrganisationId;
+
     @BeforeEach
     void setUp() {
         emergencyContactRepository.deleteAll();
@@ -69,8 +75,12 @@ class ServiceApiIntegrationTest {
 
         userRepository.save(new User("ana@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
         userRepository.save(new User("bruno@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
+        userRepository.save(new User("provider@example.com", passwordEncoder.encode("password"), UserRole.PROVIDER));
+        userRepository.save(new User("admin@example.com", passwordEncoder.encode("password"), UserRole.PLATFORM_ADMIN));
         Organisation pharmacy = organisationRepository.save(new Organisation("Test Pharmacy", true));
         Organisation dayCentre = organisationRepository.save(new Organisation("Test Day Centre", true));
+        Organisation pendingOrganisation = organisationRepository.save(new Organisation("Pending Organisation", false));
+        unverifiedOrganisationId = pendingOrganisation.getId();
 
         supportServiceRepository.save(new SupportService(
                 pharmacy,
@@ -175,6 +185,269 @@ class ServiceApiIntegrationTest {
     void rejectsUnsupportedUnauthenticatedServiceMutations() throws Exception {
         mockMvc.perform(post("/api/v1/services"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void platformAdminCanVerifyAndRevokeAnOrganisationIdempotently() throws Exception {
+        String token = tokenFor("admin@example.com");
+        String endpoint = "/api/v1/admin/organisations/" + unverifiedOrganisationId + "/verification";
+
+        String firstVerification = mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"verified":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(unverifiedOrganisationId.toString()))
+                .andExpect(jsonPath("$.name").value("Pending Organisation"))
+                .andExpect(jsonPath("$.verified").value(true))
+                .andExpect(jsonPath("$.verifiedAt").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .replaceAll(".*\"verifiedAt\":\"([^\"]+)\".*", "$1");
+
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"verified":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verifiedAt").value(firstVerification));
+
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"verified":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(false))
+                .andExpect(jsonPath("$.verifiedAt").doesNotExist());
+    }
+
+    @Test
+    void onlyPlatformAdminsCanChangeOrganisationVerification() throws Exception {
+        String endpoint = "/api/v1/admin/organisations/" + unverifiedOrganisationId + "/verification";
+        String request = """
+                {"verified":true}
+                """;
+
+        mockMvc.perform(get("/api/v1/admin/organisations"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/admin/organisations")
+                        .header("Authorization", "Bearer " + tokenFor("provider@example.com")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put(endpoint)
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + caregiverToken())
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + tokenFor("provider@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/admin/organisations/00000000-0000-0000-0000-000000000000/verification")
+                        .header("Authorization", "Bearer " + tokenFor("admin@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void organisationDetailsArePublicOnlyAfterPlatformAdminVerification() throws Exception {
+        Organisation organisation = organisationRepository.findById(unverifiedOrganisationId).orElseThrow();
+        organisation.updatePublicDetails(
+                "contact@pending.example",
+                "+351 220 000 002",
+                "https://pending.example",
+                "Boavista"
+        );
+        organisationRepository.save(organisation);
+        SupportService service = supportServiceRepository.save(new SupportService(
+                organisation,
+                "Pending Service",
+                ServiceType.PHARMACY,
+                "Boavista",
+                "09:00 - 17:00",
+                ServiceStatus.OPEN,
+                "+351220000002"
+        ));
+        String serviceId = service.getId().toString();
+        String adminToken = tokenFor("admin@example.com");
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(false))
+                .andExpect(jsonPath("$.organisationEmail").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationPhone").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationWebsite").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationCoarseLocation").value(org.hamcrest.Matchers.nullValue()));
+
+        String adminOrganisations = mockMvc.perform(get("/api/v1/admin/organisations")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertTrue(adminOrganisations.contains("contact@pending.example"));
+
+        mockMvc.perform(put("/api/v1/admin/organisations/" + unverifiedOrganisationId + "/verification")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"verified":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true))
+                .andExpect(jsonPath("$.organisationEmail").value("contact@pending.example"))
+                .andExpect(jsonPath("$.organisationPhone").value("+351 220 000 002"))
+                .andExpect(jsonPath("$.organisationWebsite").value("https://pending.example"))
+                .andExpect(jsonPath("$.organisationCoarseLocation").value("Boavista"));
+
+        mockMvc.perform(put("/api/v1/admin/organisations/" + unverifiedOrganisationId + "/verification")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"verified":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(false));
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(false))
+                .andExpect(jsonPath("$.organisationEmail").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationPhone").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationWebsite").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.organisationCoarseLocation").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void platformAdminCanUpdatePublicOrganisationDetails() throws Exception {
+        String serviceId = supportServiceRepository.findAll().stream()
+                .filter(service -> service.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow()
+                .getId()
+                .toString();
+        String organisationId = supportServiceRepository.findAll().stream()
+                .filter(service -> service.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow()
+                .getOrganisation()
+                .getId()
+                .toString();
+        String adminToken = tokenFor("admin@example.com");
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "officialEmail": "contact@test-pharmacy.example",
+                                  "officialPhone": "+351 220 000 000",
+                                  "website": "https://test-pharmacy.example",
+                                  "coarseLocation": "Boavista"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.officialEmail").value("contact@test-pharmacy.example"))
+                .andExpect(jsonPath("$.officialPhone").value("+351 220 000 000"))
+                .andExpect(jsonPath("$.website").value("https://test-pharmacy.example"))
+                .andExpect(jsonPath("$.coarseLocation").value("Boavista"));
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organisationEmail").value("contact@test-pharmacy.example"))
+                .andExpect(jsonPath("$.organisationPhone").value("+351 220 000 000"))
+                .andExpect(jsonPath("$.organisationWebsite").value("https://test-pharmacy.example"))
+                .andExpect(jsonPath("$.organisationCoarseLocation").value("Boavista"));
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"officialEmail":""}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.officialEmail").doesNotExist())
+                .andExpect(jsonPath("$.website").value("https://test-pharmacy.example"));
+
+        mockMvc.perform(get("/api/v1/services/" + serviceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organisationPhone").value("+351 220 000 000"))
+                .andExpect(jsonPath("$.organisationWebsite").value("https://test-pharmacy.example"))
+                .andExpect(jsonPath("$.organisationCoarseLocation").value("Boavista"));
+    }
+
+    @Test
+    void rejectsInvalidOrganisationContactDetails() throws Exception {
+        String organisationId = supportServiceRepository.findAll().stream()
+                .filter(service -> service.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow()
+                .getOrganisation()
+                .getId()
+                .toString();
+        String adminToken = tokenFor("admin@example.com");
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"officialEmail":"not-an-email"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"website":"javascript:alert(1)"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"officialPhone":"javascript:alert(1)"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/v1/admin/organisations/" + organisationId)
+                        .header("Authorization", "Bearer " + tokenFor("provider@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"officialEmail":"contact@test-pharmacy.example"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void requiresAnExplicitVerificationValue() throws Exception {
+        mockMvc.perform(put("/api/v1/admin/organisations/" + unverifiedOrganisationId + "/verification")
+                        .header("Authorization", "Bearer " + tokenFor("admin@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

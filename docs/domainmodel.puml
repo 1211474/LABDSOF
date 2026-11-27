@@ -57,6 +57,10 @@ class Notification {
 class Organisation {
   +id : UUID
   +name : String
+  +officialEmail : String
+  +officialPhone : String
+  +website : String
+  +coarseLocation : String
   +verificationState : VerificationState
   +verifiedAt : Instant
 }

@@ -18,22 +18,33 @@ public record ServiceResponse(
         String contactPhone,
         String source,
         boolean verified,
-        Instant lastUpdated
+        Instant lastUpdated,
+        String organisationEmail,
+        String organisationPhone,
+        String organisationWebsite,
+        String organisationCoarseLocation
 ) {
 
     public static ServiceResponse from(SupportService service) {
+        var organisation = service.getOrganisation();
+        boolean verified = organisation.isVerified();
+
         return new ServiceResponse(
                 service.getId(),
-                service.getOrganisation().getId(),
+                organisation.getId(),
                 service.getName(),
                 service.getType(),
                 service.getCoarseLocation(),
                 service.getOperatingHours(),
                 service.getCurrentStatus(),
                 service.getContactPhone(),
-                service.getOrganisation().getName(),
-                service.isVerified(),
-                service.getLastUpdated()
+                organisation.getName(),
+                verified,
+                service.getLastUpdated(),
+                verified ? organisation.getOfficialEmail() : null,
+                verified ? organisation.getOfficialPhone() : null,
+                verified ? organisation.getWebsite() : null,
+                verified ? organisation.getCoarseLocation() : null
         );
     }
 }

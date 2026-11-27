@@ -2,5 +2,6 @@ package pt.isep.careplatform.entity;
 
 public enum UserRole {
     CAREGIVER,
-    PROVIDER
+    PROVIDER,
+    PLATFORM_ADMIN
 }
