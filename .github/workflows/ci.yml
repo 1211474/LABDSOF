@@ -100,8 +100,10 @@ jobs:
             -d '{"query":"pharmacies near Boavista"}' \
             -o /tmp/ai.json
           grep -q "PHARMACY" /tmp/ai.json
-          curl -fsS http://localhost:9090/actuator/prometheus | grep -q '^http_server_requests_seconds_count'
-          curl -fsS http://localhost:9091/actuator/prometheus | grep -q '^http_server_requests_seconds_count'
+          curl -fsS http://localhost:9090/actuator/prometheus -o /tmp/care-platform-metrics.prom
+          grep -q '^http_server_requests_seconds_count' /tmp/care-platform-metrics.prom
+          curl -fsS http://localhost:9091/actuator/prometheus -o /tmp/support-assistant-metrics.prom
+          grep -q '^http_server_requests_seconds_count' /tmp/support-assistant-metrics.prom
           curl -fsS http://localhost:3000/ -o /tmp/index.html
           grep -q "Rede de Apoio a Cuidadores Informais" /tmp/index.html
           curl -fsS "http://localhost:3000/api/v1/services?type=PHARMACY&coarseLocation=Boavista" -o /tmp/proxied-services.json
