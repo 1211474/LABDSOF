@@ -94,12 +94,16 @@ jobs:
             | jq -e -s -R 'split("\n") | map(select(length > 0) | fromjson) | length > 0 and all(.[]; .service == "support-assistant-service" and has("level") and has("message"))' \
             >/dev/null
           curl -fsS "http://localhost:8080/api/v1/services?type=PHARMACY&coarseLocation=Boavista" -o /tmp/services.json
-          grep -q "PHARMACY" /tmp/services.json
+          jq -e 'length >= 1 and all(.[]; .type == "PHARMACY" and .coarseLocation == "Boavista" and .verified == true and (.contactPhone | length > 0) and (.lastUpdated | length > 0))' /tmp/services.json >/dev/null
+          service_id="$(jq -r '.[0].id' /tmp/services.json)"
+          curl -fsS "http://localhost:8080/api/v1/services/$service_id" -o /tmp/service-detail.json
+          jq -e --arg id "$service_id" '.id == $id and .verified == true and (.source | length > 0) and (.lastUpdated | length > 0)' /tmp/service-detail.json >/dev/null
           curl -fsS -X POST http://localhost:8081/api/v1/ai/navigate \
             -H "Content-Type: application/json" \
             -d '{"query":"pharmacies near Boavista"}' \
             -o /tmp/ai.json
-          grep -q "PHARMACY" /tmp/ai.json
+          jq -e '.answer | length > 0' /tmp/ai.json >/dev/null
+          jq -e '.limitations | any(. == "A disponibilidade em tempo real não é garantida. Confirme sempre diretamente com a instituição.")' /tmp/ai.json >/dev/null
           curl -fsS http://localhost:9090/actuator/prometheus -o /tmp/care-platform-metrics.prom
           grep -q '^http_server_requests_seconds_count' /tmp/care-platform-metrics.prom
           curl -fsS http://localhost:9091/actuator/prometheus -o /tmp/support-assistant-metrics.prom

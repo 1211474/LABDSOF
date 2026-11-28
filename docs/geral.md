@@ -964,6 +964,27 @@ Then the update must be completed and publicly reflected in less than 1 minute,
 And the status must be marked with an "Official Status" badge.
 ```
 
+### US36: Integration tests of the main flows
+
+```gherkin
+Given the application is started with the same configuration used for integration and smoke tests,
+When a caregiver searches for and opens a service,
+Then the public search, service detail, trust metadata and call/contact data must come from the Care Platform API.
+
+Given the Care Platform API exposes a support request flow,
+When an authenticated caregiver creates a support request for a backup contact,
+Then the request and its transactional outbox notification must be committed together,
+And unauthorized or cross-caregiver access must be rejected by the backend.
+
+Given a provider belongs to a verified organisation,
+When the provider updates a service status,
+Then the change must be visible through the public API and marked as official.
+
+Given the main flows are exercised through Docker Compose,
+When the CI pipeline runs the smoke test,
+Then the public search, AI fallback, frontend proxy and backend health/metrics checks must pass.
+```
+
 # Release Plan
 The release plan follows the story map. **Allocation of stories to the actual sprints is still to be agreed by the team** (it depends on estimates and on the assignment's sprint requirements). The team consists of 4 members (Manuel Sá - PM/DEV, Carlos Lopes - SM/DEV, Filipe Magalhães - BA/DEV, Guilherme Rodrigues - QA/DEV).
 
