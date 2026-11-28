@@ -20,8 +20,15 @@ Application URLs:
 - Frontend: <http://localhost:3000>
 - Care Platform API: <http://localhost:8080>
 - Support Assistant Service: <http://localhost:8081>
-- Care Platform health: <http://localhost:8080/actuator/health>
-- Support Assistant health: <http://localhost:8081/actuator/health>
+- Care Platform health: <http://localhost:9090/actuator/health>
+- Support Assistant health: <http://localhost:9091/actuator/health>
+- Prometheus dashboard: <http://localhost:9092>
+
+Backend health and Prometheus endpoints run on separate management ports, bound to localhost
+for development and not exposed on the public API ports. Prometheus scrapes both backends on the
+internal Compose network. Backend logs are emitted as JSON to standard output; do not add
+credentials, personal data, care details, or AI prompts/responses to log messages.
+In deployed environments, keep management ports restricted to the monitoring network.
 
 Stop the application:
 

@@ -57,7 +57,7 @@ public class GeminiLlmProvider implements LlmProvider {
                     .retrieve()
                     .body(GeminiGenerateResponse.class);
         } catch (RestClientException exception) {
-            LOGGER.warn("Gemini request failed: {}", exception.getMessage());
+            LOGGER.warn("Gemini request failed ({})", exception.getClass().getSimpleName());
             throw new LlmCompletionException("Gemini request failed", exception);
         }
 

@@ -16,7 +16,8 @@ public class AssistantExceptionHandler {
 
     @ExceptionHandler(AssistantUnavailableException.class)
     public ResponseEntity<FallbackResponse> handleAssistantUnavailable(AssistantUnavailableException exception) {
-        LOGGER.warn("Support Assistant could not retrieve verified service information", exception);
+        LOGGER.warn("Support Assistant could not retrieve verified service information ({})",
+                exception.getClass().getSimpleName());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new FallbackResponse(
                         "O assistente está temporariamente indisponível. Use a pesquisa do diretório.",
