@@ -49,6 +49,9 @@ public class SupportService {
     @Column(name = "contact_phone", nullable = false, length = 40)
     private String contactPhone;
 
+    @Column(name = "official_notice", length = 500)
+    private String officialNotice;
+
     @Column(name = "last_updated", nullable = false)
     private Instant lastUpdated;
 
@@ -114,6 +117,17 @@ public class SupportService {
 
     public Instant getLastUpdated() {
         return lastUpdated;
+    }
+
+    public String getOfficialNotice() {
+        return officialNotice;
+    }
+
+    public void updateStatus(ServiceStatus currentStatus, String operatingHours, String officialNotice) {
+        this.currentStatus = currentStatus;
+        this.operatingHours = operatingHours;
+        this.officialNotice = officialNotice;
+        this.lastUpdated = Instant.now();
     }
 
     public boolean isVerified() {

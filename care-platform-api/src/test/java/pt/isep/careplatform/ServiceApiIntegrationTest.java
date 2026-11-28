@@ -75,11 +75,16 @@ class ServiceApiIntegrationTest {
 
         userRepository.save(new User("ana@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
         userRepository.save(new User("bruno@example.com", passwordEncoder.encode("password"), UserRole.CAREGIVER));
-        userRepository.save(new User("provider@example.com", passwordEncoder.encode("password"), UserRole.PROVIDER));
         userRepository.save(new User("admin@example.com", passwordEncoder.encode("password"), UserRole.PLATFORM_ADMIN));
         Organisation pharmacy = organisationRepository.save(new Organisation("Test Pharmacy", true));
         Organisation dayCentre = organisationRepository.save(new Organisation("Test Day Centre", true));
         Organisation pendingOrganisation = organisationRepository.save(new Organisation("Pending Organisation", false));
+        userRepository.save(new User(
+                "provider@example.com",
+                passwordEncoder.encode("password"),
+                UserRole.PROVIDER,
+                pharmacy
+        ));
         unverifiedOrganisationId = pendingOrganisation.getId();
 
         supportServiceRepository.save(new SupportService(
@@ -267,6 +272,81 @@ class ServiceApiIntegrationTest {
     }
 
     @Test
+    void platformAdminCanAssignProviderToOrganisation() throws Exception {
+        String adminToken = tokenFor("admin@example.com");
+        String providerId = userRepository.findByEmailIgnoreCase("provider@example.com")
+                .orElseThrow()
+                .getId()
+                .toString();
+        SupportService dayCentreService = supportServiceRepository.findAll().stream()
+                .filter(item -> item.getName().equals("Test Day Centre"))
+                .findFirst()
+                .orElseThrow();
+        String organisationId = dayCentreService.getOrganisation().getId().toString();
+
+        mockMvc.perform(get("/api/v1/admin/providers")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("provider@example.com"));
+
+        mockMvc.perform(put("/api/v1/admin/providers/" + providerId + "/organisation")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"organisationId":"%s"}
+                                """.formatted(organisationId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organisationId").value(organisationId))
+                .andExpect(jsonPath("$.organisationName").value("Test Day Centre"))
+                .andExpect(jsonPath("$.organisationVerified").value(true));
+
+        mockMvc.perform(get("/api/v1/services/provider/me")
+                        .header("Authorization", "Bearer " + tokenFor("provider@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("Test Day Centre"));
+    }
+
+    @Test
+    void onlyPlatformAdminsCanAssignProvidersToOrganisations() throws Exception {
+        String providerId = userRepository.findByEmailIgnoreCase("provider@example.com")
+                .orElseThrow()
+                .getId()
+                .toString();
+        String caregiverId = userRepository.findByEmailIgnoreCase("ana@example.com")
+                .orElseThrow()
+                .getId()
+                .toString();
+        String request = """
+                {"organisationId":"%s"}
+                """.formatted(unverifiedOrganisationId);
+        String endpoint = "/api/v1/admin/providers/" + providerId + "/organisation";
+
+        mockMvc.perform(get("/api/v1/admin/providers"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/admin/providers")
+                        .header("Authorization", "Bearer " + tokenFor("provider@example.com")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + caregiverToken())
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/admin/providers/" + caregiverId + "/organisation")
+                        .header("Authorization", "Bearer " + tokenFor("admin@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put(endpoint)
+                        .header("Authorization", "Bearer " + tokenFor("admin@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"organisationId":"00000000-0000-0000-0000-000000000000"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void organisationDetailsArePublicOnlyAfterPlatformAdminVerification() throws Exception {
         Organisation organisation = organisationRepository.findById(unverifiedOrganisationId).orElseThrow();
         organisation.updatePublicDetails(
@@ -448,6 +528,102 @@ class ServiceApiIntegrationTest {
                         .contentType(APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void verifiedProviderCanPublishAndUpdateOfficialServiceStatus() throws Exception {
+        String token = tokenFor("provider@example.com");
+        SupportService service = supportServiceRepository.findAll().stream()
+                .filter(item -> item.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/services/provider/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("Test Pharmacy"));
+
+        mockMvc.perform(patch("/api/v1/services/" + service.getId() + "/provider-status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status":"TEMPORARILY_CLOSED",
+                                  "operatingHours":"10:00 - 16:00",
+                                  "officialNotice":"Closed for renovation"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("TEMPORARILY_CLOSED"))
+                .andExpect(jsonPath("$.operatingHours").value("10:00 - 16:00"))
+                .andExpect(jsonPath("$.officialNotice").value("Closed for renovation"))
+                .andExpect(jsonPath("$.verified").value(true));
+
+        mockMvc.perform(get("/api/v1/services/" + service.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentStatus").value("TEMPORARILY_CLOSED"))
+                .andExpect(jsonPath("$.verified").value(true))
+                .andExpect(jsonPath("$.officialNotice").value("Closed for renovation"));
+    }
+
+    @Test
+    void providerCannotUpdateAnotherOrganisationService() throws Exception {
+        String token = tokenFor("provider@example.com");
+        SupportService otherService = supportServiceRepository.findAll().stream()
+                .filter(item -> item.getName().equals("Test Day Centre"))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(patch("/api/v1/services/" + otherService.getId() + "/provider-status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"status":"CLOSED","operatingHours":"09:00 - 17:00","officialNotice":"Closed"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void providerStatusUpdateRequiresProviderAuthenticationAndVerifiedOrganisation() throws Exception {
+        SupportService service = supportServiceRepository.findAll().stream()
+                .filter(item -> item.getName().equals("Test Pharmacy"))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(patch("/api/v1/services/" + service.getId() + "/provider-status")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(patch("/api/v1/services/" + service.getId() + "/provider-status")
+                        .header("Authorization", "Bearer " + caregiverToken())
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isForbidden());
+
+        Organisation pending = organisationRepository.findById(unverifiedOrganisationId).orElseThrow();
+        SupportService pendingService = supportServiceRepository.save(new SupportService(
+                pending,
+                "Pending Service",
+                ServiceType.OTHER,
+                "Boavista",
+                "09:00 - 17:00",
+                ServiceStatus.UNKNOWN,
+                "+351220000999"
+        ));
+        userRepository.save(new User(
+                "pending-provider@example.com",
+                passwordEncoder.encode("password"),
+                UserRole.PROVIDER,
+                pending
+        ));
+
+        mockMvc.perform(patch("/api/v1/services/" + pendingService.getId() + "/provider-status")
+                        .header("Authorization", "Bearer " + tokenFor("pending-provider@example.com"))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"status\":\"OPEN\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

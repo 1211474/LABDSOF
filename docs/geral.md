@@ -135,20 +135,19 @@ A story is Done only when:
 **Situation:** A closure, schedule change, vacancy, or temporary change generates repeated calls from families.
 **Goal:** Publish an official update in under one minute, with appropriate accountability and controls.
 
-**1\.** Sofia signs in to a verified organisation account.
-**2\.** She selects the service and changes its status, availability, schedule, or relevant notice.
-**3\.** She confirms the validity period and publishes the update.
-**4\.** The system presents the information as “Official status”, with the date and time of the last update.
-**5\.** Caregivers see the update distinguished from community reports and can contact the institution directly.
-**6\.** Sofia can correct or remove incorrect information.
+**1\.** Sofia signs in to an account associated with an organisation verified by a platform admin.
+**2\.** She selects a service belonging to that organisation and updates its operating status, schedule, or notice.
+**3\.** The system validates her role, organisation verification, service ownership, and submitted fields.
+**4\.** A valid update is saved and publicly reflected as “Official status” with its last-updated date and time in under one minute. No per-update admin approval is required.
+**5\.** Caregivers see the official update distinguished from community reports and can contact the institution directly.
 
-[journey4\_service\_information (3).bpmn](https://t90122138845.p.clickup-attachments.com/t90122138845/0e0a88ab-cd50-4aff-aed2-34349701460a/journey4_service_information%20\(3\).bpmn)
+Validity periods, update audit history, and provider correction or withdrawal are Release 2 capabilities.
 
-[diagram.svg](https://t90122138845.p.clickup-attachments.com/t90122138845/19ed4646-c388-45e1-bda6-28400f7bca62/diagram.svg)
+[journey4\_service\_information.bpmn](./journey4_service_information.bpmn)
 
 **Expected outcome:** Families get more up-to-date information, and Sofia reduces repetitive calls without creating a false promise of availability.
 
-**Critical requirements:** verified account; fast updates; separation between official and community sources; update history or date; correction and removal of information; least-privilege permissions.
+**Critical requirements:** verified account; fast updates; separation between official and community sources; visible last-updated date/time; least-privilege permissions. Validity periods, provider correction or removal, and detailed audit history are Release 2 capabilities.
 
 **Associated criteria:** an update in under 1 minute, source and freshness visible in every result, and role-based access control, as defined in Private ([https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-312](https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-312)), Private ([https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-352](https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-352)), and Private ([https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-272](https://app.clickup.com/90122138845/docs/2kxv5d6x-692/2kxv5d6x-272)).
 
@@ -221,10 +220,10 @@ These criteria follow Private ([https://app.clickup.com/90122138845/docs/2kxv5d6
 No release should be considered successful if it makes the care workflow easier by creating an unacceptable privacy or safety risk.
 # 5\. Service Provider and Community Criteria
 For Sofia, the service-provider experience must be lightweight enough to sustain current information:
-*   A verified organisation can update open/closed status, availability or relevant service changes in under 1 minute.
+*   A verified organisation can update a service's operating status, schedule, or notice in under 1 minute.
 *   Official updates are visibly separated from community reports.
 *   Service providers can see only the information required for their role.
-*   A provider can correct or withdraw an inaccurate update.
+*   Validity periods, update audit history, and provider correction or withdrawal are planned for Release 2.
 
 For Rui and other backup helpers:
 *   A support request states what is needed, where, and when.
@@ -438,7 +437,7 @@ The caregiver can send a concrete request to a backup person with:
 
 The recipient can accept or decline. The caregiver can see whether the request is pending, accepted or declined.
 ### E. Verified service updates
-A verified organisation can update a service's status, schedule, availability or notice in under one minute. Official information is visibly separated from community reports, includes the update time and can be corrected or withdrawn.
+A verified organisation can update a service's status, schedule or notice in under one minute. Official information is visibly separated from community reports and includes the update time. Validity periods, audit history, and correction or withdrawal are planned for Release 2.
 ## 4\. Non-functional requirements
 *   Mobile-first, accessible interface with large text, high contrast, clear labels and large touch targets.
 *   A human contact option at every critical point.
@@ -2006,7 +2005,7 @@ The threat model follows the STRIDE framework to identify, evaluate, and mitigat
 | ---| ---| ---| --- |
 | Spoofing | Unauthorized user impersonates an informal caregiver, backup contact, or verified service provider. | Access to support requests, unauthorized updates to institutional availability. | JWT Authentication & RBAC: Enforce signed JWT tokens with role-specific claims (ADR-006). HTTPS enforced end-to-end. |
 | Tampering | Unverified entity or attacker modifies local service status or alters support request details in transit. | Caregivers receive false information about open pharmacies or altered support locations. | Backend Authorization Checks: Enforce DB-level ownership and role verification on `PATCH /services/{id}`. Input sanitization and TLS 1.3 encryption in transit. |
-| Repudiation | A verified organization denies changing its operating status or a user denies accepting a request. | Trust degradation and operational disputes. | Audit Logging: Maintain immutable database logs (`created_at`, `updated_by`, `action_type`) for status updates and role state changes. |
+| Repudiation | A verified organization denies changing its operating status or a user denies accepting a request. | Trust degradation and operational disputes. | Release 1 exposes the service's last-updated timestamp. The immutable service-change audit history (`created_at`, `updated_by`, `action_type`) is US25 / Release 2; security and role changes remain subject to platform audit logging. |
 | Information Disclosure | Leakage of caregiver location, phone numbers, or non-sensitive accessibility notes to external parties or LLM providers. | Violation of user privacy and potential exposure of vulnerable individuals. | Data Minimization & AI Grounding (ADR-007, ADR-008): Never send personal user data or exact residential addresses to external LLM providers. Coarse/parish-level location sharing for support requests. |
 | Denial of Service | Malicious bot or user floods search endpoints or AI navigation APIs. | Application unavailability during critical caregiver disruption scenarios. | API Rate Limiting & Throttling: Implement Spring Security rate limiting (e.g., Bucket4j or API gateway limits) on `/api/v1/ai/navigate` and public search APIs. |
 | Elevation of Privilege | A registered caregiver attempts to modify organisation verified status or access another user's care profile. | Unauthorized access to system capabilities or another user's care data. | Method-Level Security: Enforce `@PreAuthorize("hasRole('SERVICE_PROVIDER')")` or custom Spring Security expressions validating resource ownership (`user_id == current_user_id`). |
@@ -2248,7 +2247,7 @@ The estimate should be updated when the team confirms the sprint allocation, sel
 | F-04 | Bounded and grounded AI. The AI only retrieves and summarises verified application data; it must not invent service facts, give medical advice or make emergency decisions. Medical/emergency queries are redirected to 112 / SNS 24. | Success Criteria §3; Responsible AI §1, §4; ADR-009 |
 | F-05 | Trust signals on every result. Every result shows its source, verification state (Official vs community) and last-update time, and never presents availability as a guarantee. | Success Criteria §2.3; MVP §3B; US10 |
 | F-06 | Human fallback. Every service result and AI recommendation includes a prominent "Call / Contact" action and a limitation notice. | Success Criteria §2.3, §3; MVP §4; US11 |
-| F-07 | Encryption and audit. Data protected in transit (HTTPS) and at rest where appropriate; immutable audit logging of status updates and role changes; logs must not expose sensitive content. | Success Criteria §4; ADR-010; Security Assessment §1 |
+| F-07 | Encryption and audit. Data protected in transit (HTTPS) and at rest where appropriate; security and role changes are audited; immutable service-update history is US25 / Release 2; logs must not expose sensitive content. | Success Criteria §4; ADR-010; Security Assessment §1 |
 
 * * *
 ## U — Usability
