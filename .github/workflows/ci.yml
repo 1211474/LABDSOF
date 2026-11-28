@@ -66,7 +66,33 @@ jobs:
         run: docker compose up -d --build --wait --wait-timeout 300
       - name: Verify the end-to-end slice
         run: |
-          curl -fsS http://localhost:8080/actuator/health
+          curl -fsS http://localhost:9090/actuator/health/readiness | jq -e '.status == "UP"'
+          curl -fsS http://localhost:9091/actuator/health/readiness | jq -e '.status == "UP"'
+          if curl -fsS http://localhost:8080/actuator/prometheus >/dev/null 2>&1; then
+            echo "Care Platform metrics must not be exposed on the public API port"
+            exit 1
+          fi
+          if curl -fsS http://localhost:8081/actuator/prometheus >/dev/null 2>&1; then
+            echo "Support Assistant metrics must not be exposed on the public API port"
+            exit 1
+          fi
+          for attempt in $(seq 1 12); do
+            if curl -fsS http://localhost:9092/api/v1/targets \
+              | jq -e '[.data.activeTargets[] | select(.health == "up")] | length == 2' >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              echo "Prometheus did not scrape both backend services"
+              exit 1
+            fi
+            sleep 5
+          done
+          docker compose logs --no-color --no-log-prefix care-platform-api \
+            | jq -e -s -R 'split("\n") | map(select(length > 0) | fromjson) | length > 0 and all(.[]; .service == "care-platform-api" and has("level") and has("message"))' \
+            >/dev/null
+          docker compose logs --no-color --no-log-prefix support-assistant-service \
+            | jq -e -s -R 'split("\n") | map(select(length > 0) | fromjson) | length > 0 and all(.[]; .service == "support-assistant-service" and has("level") and has("message"))' \
+            >/dev/null
           curl -fsS "http://localhost:8080/api/v1/services?type=PHARMACY&coarseLocation=Boavista" -o /tmp/services.json
           grep -q "PHARMACY" /tmp/services.json
           curl -fsS -X POST http://localhost:8081/api/v1/ai/navigate \
@@ -74,6 +100,10 @@ jobs:
             -d '{"query":"pharmacies near Boavista"}' \
             -o /tmp/ai.json
           grep -q "PHARMACY" /tmp/ai.json
+          curl -fsS http://localhost:9090/actuator/prometheus -o /tmp/care-platform-metrics.prom
+          grep -q '^http_server_requests_seconds_count' /tmp/care-platform-metrics.prom
+          curl -fsS http://localhost:9091/actuator/prometheus -o /tmp/support-assistant-metrics.prom
+          grep -q '^http_server_requests_seconds_count' /tmp/support-assistant-metrics.prom
           curl -fsS http://localhost:3000/ -o /tmp/index.html
           grep -q "Rede de Apoio a Cuidadores Informais" /tmp/index.html
           curl -fsS "http://localhost:3000/api/v1/services?type=PHARMACY&coarseLocation=Boavista" -o /tmp/proxied-services.json

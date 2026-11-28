@@ -1,6 +1,8 @@
 spring:
   application:
     name: care-platform-api
+  main:
+    banner-mode: off
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/careplatform}
     username: ${SPRING_DATASOURCE_USERNAME:careplatform}
@@ -24,15 +26,16 @@ security:
     password: ${PLATFORM_ADMIN_PASSWORD:}
 
 management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:9090}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
-
-logging:
-  level:
-    org.springframework.security: DEBUG
+      group:
+        readiness:
+          include: readinessState,db
