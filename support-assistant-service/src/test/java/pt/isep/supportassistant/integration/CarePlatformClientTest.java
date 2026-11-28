@@ -4,13 +4,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import pt.isep.supportassistant.dto.CareServiceDto;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
 class CarePlatformClientTest {
 
@@ -57,6 +60,20 @@ class CarePlatformClientTest {
         List<CareServiceDto> services = client.fetchServices(null, null);
 
         assertThat(services).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void surfacesCarePlatformFailure() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://localhost:8080");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CarePlatformClient client = new CarePlatformClient(builder.build());
+
+        server.expect(requestTo("http://localhost:8080/api/v1/services"))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.fetchServices(null, null))
+                .isInstanceOf(RestClientException.class);
         server.verify();
     }
 }
